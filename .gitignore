@@ -1,0 +1,40 @@
+# Артефакты индексации
+index.sqlite
+index.sqlite-shm
+index.sqlite-wal
+*.sqlite
+*.sqlite.snapshots/
+.docs-cache/
+
+# PHP
+indexer/vendor/
+indexer/.composer-home/
+indexer/.phpunit.result.cache
+indexer/.phpunit.cache/
+*.log
+*.cache
+
+# Node / TypeScript
+server/node_modules/
+server/dist/
+node_modules/
+
+# Исследовательский прогон фазы 0 — не часть поставки
+.research/vendor/
+.research/.composer-home/
+.research/composer.lock
+
+# Окружение
+.env
+.env.*
+
+# Агент может хранить в этом каталоге токены и приватные артефакты
+.claude/
+
+# Системное
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.idea/
+.vscode/

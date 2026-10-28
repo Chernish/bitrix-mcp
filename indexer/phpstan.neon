@@ -1,0 +1,10 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - bin
+    excludePaths:
+        - tests/fixtures/*
+    # Фикстуры содержат намеренно нестандартный код (короткие теги, старый синтаксис)
+    # и не должны анализироваться как исходники проекта.
+    treatPhpDocTypesAsCertain: false

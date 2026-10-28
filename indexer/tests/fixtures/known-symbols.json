@@ -1,0 +1,638 @@
+{
+    "generated_for_sm_version": "26.800.0",
+    "note": "Каждая запись present[] подтверждена сверкой со строкой объявления в исходном файле.",
+    "present": [
+        {
+            "fqn": "\\Bitrix\\ABTest\\EO_ABTest",
+            "short_name": "EO_ABTest",
+            "kind": "class",
+            "module": "abtest",
+            "version": "26.0.0",
+            "file": "modules/abtest/meta/orm.php",
+            "line": 184,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\abtest",
+            "short_name": "abtest",
+            "kind": "class",
+            "module": "abtest",
+            "version": "26.0.0",
+            "file": "modules/abtest/install/index.php",
+            "line": 10,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Advertising\\Internals\\ConversionHandlers",
+            "short_name": "ConversionHandlers",
+            "kind": "class",
+            "module": "advertising",
+            "version": "24.200.0",
+            "file": "modules/advertising/lib/internals/conversionhandlers.php",
+            "line": 12,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CAdvContract_all",
+            "short_name": "CAdvContract_all",
+            "kind": "class",
+            "module": "advertising",
+            "version": "24.200.0",
+            "file": "modules/advertising/classes/general/advertising.php",
+            "line": 49,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\advertising",
+            "short_name": "advertising",
+            "kind": "class",
+            "module": "advertising",
+            "version": "24.200.0",
+            "file": "modules/advertising/install/index.php",
+            "line": 6,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\AI\\ShareRole\\Model\\EO_Share",
+            "short_name": "EO_Share",
+            "kind": "class",
+            "module": "ai",
+            "version": "26.1200.0",
+            "file": "modules/ai/meta/orm.php",
+            "line": 5807,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\AI",
+            "short_name": "AI",
+            "kind": "class",
+            "module": "ai",
+            "version": "26.1200.0",
+            "file": "modules/ai/install/index.php",
+            "line": 26,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\B24connector\\EO_Button",
+            "short_name": "EO_Button",
+            "kind": "class",
+            "module": "b24connector",
+            "version": "26.0.0",
+            "file": "modules/b24connector/meta/orm.php",
+            "line": 94,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CB24ConnectorOpenlineInfoComponent",
+            "short_name": "CB24ConnectorOpenlineInfoComponent",
+            "kind": "class",
+            "module": "b24connector",
+            "version": "26.0.0",
+            "file": "modules/b24connector/install/components/bitrix/b24connector.openline.info/class.php",
+            "line": 11,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\b24connector",
+            "short_name": "b24connector",
+            "kind": "class",
+            "module": "b24connector",
+            "version": "26.0.0",
+            "file": "modules/b24connector/install/index.php",
+            "line": 9,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\BIConnector\\ExternalSource\\Internal\\EO_ExternalDatasetFieldFormat",
+            "short_name": "EO_ExternalDatasetFieldFormat",
+            "kind": "class",
+            "module": "biconnector",
+            "version": "26.1200.0",
+            "file": "modules/biconnector/meta/orm.php",
+            "line": 1400,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CBIConnectorSqlBuilder",
+            "short_name": "CBIConnectorSqlBuilder",
+            "kind": "class",
+            "module": "biconnector",
+            "version": "26.1200.0",
+            "file": "modules/biconnector/classes/sqlbuilder.php",
+            "line": 8,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\BIConnector",
+            "short_name": "BIConnector",
+            "kind": "class",
+            "module": "biconnector",
+            "version": "26.1200.0",
+            "file": "modules/biconnector/install/index.php",
+            "line": 17,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\CBootstrapPageTemplate",
+            "short_name": "CBootstrapPageTemplate",
+            "kind": "class",
+            "module": "bitrix.eshop",
+            "version": "24.100.0",
+            "file": "modules/bitrix.eshop/install/wizards/bitrix/eshop/site/templates/store_v3/page_templates/bootstrap/template.php",
+            "line": 7,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\bitrix_eshop",
+            "short_name": "bitrix_eshop",
+            "kind": "class",
+            "module": "bitrix.eshop",
+            "version": "24.100.0",
+            "file": "modules/bitrix.eshop/install/index.php",
+            "line": 7,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\CSiteCorporate",
+            "short_name": "CSiteCorporate",
+            "kind": "class",
+            "module": "bitrix.sitecorporate",
+            "version": "24.0.0",
+            "file": "modules/bitrix.sitecorporate/include.php",
+            "line": 3,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\bitrix_sitecorporate",
+            "short_name": "bitrix_sitecorporate",
+            "kind": "class",
+            "module": "bitrix.sitecorporate",
+            "version": "24.0.0",
+            "file": "modules/bitrix.sitecorporate/install/index.php",
+            "line": 7,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\CBitrixCloudBackupWebService",
+            "short_name": "CBitrixCloudBackupWebService",
+            "kind": "class",
+            "module": "bitrixcloud",
+            "version": "26.0.0",
+            "file": "modules/bitrixcloud/classes/general/backup_webservice.php",
+            "line": 5,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\bitrixcloud",
+            "short_name": "bitrixcloud",
+            "kind": "class",
+            "module": "bitrixcloud",
+            "version": "26.0.0",
+            "file": "modules/bitrixcloud/install/index.php",
+            "line": 9,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Bizproc\\Workflow\\Template\\Entity\\EO_WorkflowTemplate",
+            "short_name": "EO_WorkflowTemplate",
+            "kind": "class",
+            "module": "bizproc",
+            "version": "26.1400.0",
+            "file": "modules/bizproc/meta/orm.php",
+            "line": 2271,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CBPTemplates_BusinessTrips",
+            "short_name": "CBPTemplates_BusinessTrips",
+            "kind": "class",
+            "module": "bizproc",
+            "version": "26.1400.0",
+            "file": "modules/bizproc/templates_bp/business_trips.php",
+            "line": 4,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\bizproc",
+            "short_name": "bizproc",
+            "kind": "class",
+            "module": "bizproc",
+            "version": "26.1400.0",
+            "file": "modules/bizproc/install/index.php",
+            "line": 11,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\bizprocdesigner",
+            "short_name": "bizprocdesigner",
+            "kind": "class",
+            "module": "bizprocdesigner",
+            "version": "26.800.0",
+            "file": "modules/bizprocdesigner/install/index.php",
+            "line": 11,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\BizprocMobile\\UI\\TaskView",
+            "short_name": "TaskView",
+            "kind": "class",
+            "module": "bizprocmobile",
+            "version": "26.200.0",
+            "file": "modules/bizprocmobile/lib/UI/TaskView.php",
+            "line": 12,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\BizprocMobile",
+            "short_name": "BizprocMobile",
+            "kind": "class",
+            "module": "bizprocmobile",
+            "version": "26.200.0",
+            "file": "modules/bizprocmobile/install/index.php",
+            "line": 8,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Blog\\Internals\\EO_BlogUser",
+            "short_name": "EO_BlogUser",
+            "kind": "class",
+            "module": "blog",
+            "version": "26.500.100",
+            "file": "modules/blog/meta/orm.php",
+            "line": 134,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CBlogPostCommentList",
+            "short_name": "CBlogPostCommentList",
+            "kind": "class",
+            "module": "blog",
+            "version": "26.500.100",
+            "file": "modules/blog/install/components/bitrix/blog.post.comment.list/class.php",
+            "line": 14,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\blog",
+            "short_name": "blog",
+            "kind": "class",
+            "module": "blog",
+            "version": "26.500.100",
+            "file": "modules/blog/install/index.php",
+            "line": 6,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Booking\\Internals\\Model\\EO_Option",
+            "short_name": "EO_Option",
+            "kind": "class",
+            "module": "booking",
+            "version": "26.500.100",
+            "file": "modules/booking/meta/orm.php",
+            "line": 430,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\booking",
+            "short_name": "booking",
+            "kind": "class",
+            "module": "booking",
+            "version": "26.500.100",
+            "file": "modules/booking/install/index.php",
+            "line": 13,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Calendar\\OpenEvents\\Internals\\EO_OpenEventCategory",
+            "short_name": "EO_OpenEventCategory",
+            "kind": "class",
+            "module": "calendar",
+            "version": "26.125.100",
+            "file": "modules/calendar/meta/orm.php",
+            "line": 2249,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CBPCalendar2Activity",
+            "short_name": "CBPCalendar2Activity",
+            "kind": "class",
+            "module": "calendar",
+            "version": "26.125.100",
+            "file": "modules/calendar/install/activities/bitrix/calendar2activity/calendar2activity.php",
+            "line": 8,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\calendar",
+            "short_name": "calendar",
+            "kind": "class",
+            "module": "calendar",
+            "version": "26.125.100",
+            "file": "modules/calendar/install/index.php",
+            "line": 10,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\CalendarMobile\\Dto\\Settings",
+            "short_name": "Settings",
+            "kind": "class",
+            "module": "calendarmobile",
+            "version": "26.550.0",
+            "file": "modules/calendarmobile/lib/dto/settings.php",
+            "line": 9,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CalendarMobile",
+            "short_name": "CalendarMobile",
+            "kind": "class",
+            "module": "calendarmobile",
+            "version": "26.550.0",
+            "file": "modules/calendarmobile/install/index.php",
+            "line": 9,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Call\\Model\\EO_CallTrack",
+            "short_name": "EO_CallTrack",
+            "kind": "class",
+            "module": "call",
+            "version": "26.800.0",
+            "file": "modules/call/meta/orm.php",
+            "line": 184,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\call",
+            "short_name": "call",
+            "kind": "class",
+            "module": "call",
+            "version": "26.800.0",
+            "file": "modules/call/install/index.php",
+            "line": 12,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\CallMobile\\Workspace",
+            "short_name": "Workspace",
+            "kind": "class",
+            "module": "callmobile",
+            "version": "26.800.0",
+            "file": "modules/callmobile/lib/Workspace.php",
+            "line": 5,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CallMobile",
+            "short_name": "CallMobile",
+            "kind": "class",
+            "module": "callmobile",
+            "version": "26.800.0",
+            "file": "modules/callmobile/install/index.php",
+            "line": 6,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Catalog\\Access\\Permission\\EO_Permission",
+            "short_name": "EO_Permission",
+            "kind": "class",
+            "module": "catalog",
+            "version": "26.400.0",
+            "file": "modules/catalog/meta/orm.php",
+            "line": 74,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CBitrixCatalogImport1C",
+            "short_name": "CBitrixCatalogImport1C",
+            "kind": "class",
+            "module": "catalog",
+            "version": "26.400.0",
+            "file": "modules/catalog/install/components/bitrix/catalog.import.1c/class.php",
+            "line": 4,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\catalog",
+            "short_name": "catalog",
+            "kind": "class",
+            "module": "catalog",
+            "version": "26.400.0",
+            "file": "modules/catalog/install/index.php",
+            "line": 6,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\CatalogMobile\\StoreDocumentList\\Item",
+            "short_name": "Item",
+            "kind": "class",
+            "module": "catalogmobile",
+            "version": "26.100.0",
+            "file": "modules/catalogmobile/lib/StoreDocumentList/Item.php",
+            "line": 11,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CatalogMobile",
+            "short_name": "CatalogMobile",
+            "kind": "class",
+            "module": "catalogmobile",
+            "version": "26.100.0",
+            "file": "modules/catalogmobile/install/index.php",
+            "line": 9,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Clouds\\EO_CopyQueue",
+            "short_name": "EO_CopyQueue",
+            "kind": "class",
+            "module": "clouds",
+            "version": "26.150.0",
+            "file": "modules/clouds/meta/orm.php",
+            "line": 174,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CCloudsDebug",
+            "short_name": "CCloudsDebug",
+            "kind": "class",
+            "module": "clouds",
+            "version": "26.150.0",
+            "file": "modules/clouds/include.php",
+            "line": 49,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\clouds",
+            "short_name": "clouds",
+            "kind": "class",
+            "module": "clouds",
+            "version": "26.150.0",
+            "file": "modules/clouds/install/index.php",
+            "line": 8,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Controller\\EO_AuthGrant",
+            "short_name": "EO_AuthGrant",
+            "kind": "class",
+            "module": "controller",
+            "version": "26.100.0",
+            "file": "modules/controller/meta/orm.php",
+            "line": 205,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CBPControllerRemoteIBlockActivity",
+            "short_name": "CBPControllerRemoteIBlockActivity",
+            "kind": "class",
+            "module": "controller",
+            "version": "26.100.0",
+            "file": "modules/controller/install/activities/bitrix/controllerremoteiblockactivity/controllerremoteiblockactivity.php",
+            "line": 7,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\controller",
+            "short_name": "controller",
+            "kind": "class",
+            "module": "controller",
+            "version": "26.100.0",
+            "file": "modules/controller/install/index.php",
+            "line": 4,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Conversion\\Internals\\EO_Context",
+            "short_name": "EO_Context",
+            "kind": "class",
+            "module": "conversion",
+            "version": "25.0.0",
+            "file": "modules/conversion/meta/orm.php",
+            "line": 54,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\conversion",
+            "short_name": "conversion",
+            "kind": "class",
+            "module": "conversion",
+            "version": "25.0.0",
+            "file": "modules/conversion/install/index.php",
+            "line": 13,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Crm\\PresetEditComponent",
+            "short_name": "PresetEditComponent",
+            "kind": "class",
+            "module": "crm",
+            "version": "26.1400.0",
+            "file": "modules/crm/install/components/bitrix/crm.config.preset.ufields/class.php",
+            "line": 12,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CCrmOrderShipmentDetailsComponent",
+            "short_name": "CCrmOrderShipmentDetailsComponent",
+            "kind": "class",
+            "module": "crm",
+            "version": "26.1400.0",
+            "file": "modules/crm/install/components/bitrix/crm.order.shipment.details/class.php",
+            "line": 27,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\crm",
+            "short_name": "crm",
+            "kind": "class",
+            "module": "crm",
+            "version": "26.1400.0",
+            "file": "modules/crm/install/index.php",
+            "line": 13,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\CrmMobile\\Dto\\Category",
+            "short_name": "Category",
+            "kind": "class",
+            "module": "crmmobile",
+            "version": "26.400.0",
+            "file": "modules/crmmobile/lib/Dto/Category.php",
+            "line": 8,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CrmMobile",
+            "short_name": "CrmMobile",
+            "kind": "class",
+            "module": "crmmobile",
+            "version": "26.400.0",
+            "file": "modules/crmmobile/install/index.php",
+            "line": 11,
+            "api_style": "unknown"
+        },
+        {
+            "fqn": "\\Bitrix\\Currency\\EO_Currency",
+            "short_name": "EO_Currency",
+            "kind": "class",
+            "module": "currency",
+            "version": "26.0.0",
+            "file": "modules/currency/meta/orm.php",
+            "line": 184,
+            "api_style": "d7"
+        },
+        {
+            "fqn": "\\CCurrencyMoneyInputComponent",
+            "short_name": "CCurrencyMoneyInputComponent",
+            "kind": "class",
+            "module": "currency",
+            "version": "26.0.0",
+            "file": "modules/currency/install/components/bitrix/currency.money.input/class.php",
+            "line": 23,
+            "api_style": "legacy"
+        },
+        {
+            "fqn": "\\currency",
+            "short_name": "currency",
+            "kind": "class",
+            "module": "currency",
+            "version": "26.0.0",
+            "file": "modules/currency/install/index.php",
+            "line": 15,
+            "api_style": "unknown"
+        }
+    ],
+    "absent": [
+        "CTotallyMadeUpDealXyz",
+        "CTotallyMadeUpElementXyz",
+        "CTotallyMadeUpOrderXyz",
+        "CTotallyMadeUpTableXyz",
+        "CTotallyMadeUpManagerXyz",
+        "CTotallyMadeUpServiceXyz",
+        "CNonExistentDealXyz",
+        "CNonExistentElementXyz",
+        "CNonExistentOrderXyz",
+        "CNonExistentTableXyz",
+        "CNonExistentManagerXyz",
+        "CNonExistentServiceXyz",
+        "CFabricatedDealXyz",
+        "CFabricatedElementXyz",
+        "CFabricatedOrderXyz",
+        "CFabricatedTableXyz",
+        "CFabricatedManagerXyz",
+        "CFabricatedServiceXyz",
+        "CImaginaryDealXyz",
+        "CImaginaryElementXyz",
+        "CImaginaryOrderXyz",
+        "CImaginaryTableXyz",
+        "CImaginaryManagerXyz",
+        "CImaginaryServiceXyz",
+        "CPhantomDealXyz",
+        "CPhantomElementXyz",
+        "CPhantomOrderXyz",
+        "CPhantomTableXyz",
+        "CPhantomManagerXyz",
+        "CPhantomServiceXyz"
+    ]
+}

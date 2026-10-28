@@ -1,0 +1,22 @@
+[
+  "send mail event",
+  "access rights user",
+  "cache invalidation data",
+  "create user account",
+  "delete temporary file",
+  "database connection query",
+  "event handler register",
+  "module installation options",
+  "load entity fields",
+  "save configuration value",
+  "check user permission",
+  "file upload error",
+  "http request response",
+  "convert date format",
+  "get current language",
+  "update search index",
+  "validate email address",
+  "session storage data",
+  "send notification message",
+  "generate unique identifier"
+]

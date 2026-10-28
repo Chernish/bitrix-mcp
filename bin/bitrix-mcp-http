@@ -1,0 +1,27 @@
+#!/bin/sh
+
+set -eu
+
+PROJECT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)"
+SERVER_ENTRY="$PROJECT_DIR/server/dist/src/http.js"
+INDEX_PATH="${BITRIX_MCP_INDEX:-$PROJECT_DIR/index.sqlite}"
+
+if ! command -v node >/dev/null 2>&1; then
+    echo "ОШИБКА: Node.js не найден в PATH." >&2
+    exit 127
+fi
+
+if [ ! -f "$SERVER_ENTRY" ]; then
+    echo "ОШИБКА: HTTP MCP-сервер не собран: $SERVER_ENTRY" >&2
+    echo "Выполните: cd $PROJECT_DIR && make server-build" >&2
+    exit 1
+fi
+
+if [ ! -f "$INDEX_PATH" ]; then
+    echo "ОШИБКА: индекс не найден: $INDEX_PATH" >&2
+    echo "Выполните: cd $PROJECT_DIR && make build && make docs" >&2
+    exit 1
+fi
+
+export BITRIX_MCP_INDEX="$INDEX_PATH"
+exec node "$SERVER_ENTRY" "$@"

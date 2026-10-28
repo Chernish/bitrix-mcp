@@ -1,0 +1,35 @@
+{
+    "name": "stroka/bitrix-mcp-indexer",
+    "description": "Индексатор ядра 1С-Битрикс: строит версионно-привязанный индекс API для MCP-сервера",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.4",
+        "ext-pdo": "*",
+        "ext-pdo_sqlite": "*",
+        "ext-json": "*",
+        "nikic/php-parser": "^5.8"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.2",
+        "phpunit/phpunit": "^11.5",
+        "squizlabs/php_codesniffer": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "BitrixMcp\\Indexer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "BitrixMcp\\Indexer\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "vendor-dir": "vendor"
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
+}

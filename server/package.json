@@ -1,0 +1,30 @@
+{
+  "name": "bitrix-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP-сервер: версионно-привязанный доступ к API ядра 1С-Битрикс",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "bitrix-mcp-server": "dist/src/index.js",
+    "bitrix-mcp-http-server": "dist/src/http.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/src/index.js",
+    "start:http": "node dist/src/http.js",
+    "test": "node --test --experimental-strip-types \"tests/unit/*.test.ts\" \"tests/contract/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "better-sqlite3": "^11.7.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

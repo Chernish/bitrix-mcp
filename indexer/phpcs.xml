@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<ruleset name="bitrix-mcp-indexer">
+    <description>Стиль кода индексатора</description>
+
+    <file>src</file>
+    <file>bin</file>
+
+    <!-- Фикстуры намеренно содержат нестандартный код: короткие открывающие теги
+         и синтаксис старых версий PHP. Проверять их стилем нельзя. -->
+    <exclude-pattern>tests/fixtures/*</exclude-pattern>
+    <exclude-pattern>vendor/*</exclude-pattern>
+
+    <arg name="colors"/>
+    <arg value="sp"/>
+
+    <rule ref="PSR12"/>
+</ruleset>
