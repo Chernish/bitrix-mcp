@@ -76,6 +76,24 @@ Authorization: Bearer <BITRIX_MCP_TOKEN>
 
 По умолчанию сервер слушает только loopback. Для доступа с другой машины задайте `BITRIX_MCP_HTTP_HOST` явно и разместите сервер за **HTTPS-прокси**: передавать Bearer-токен по открытому HTTP через сеть нельзя. CORS не включён, размер JSON-запроса ограничен 1 МиБ.
 
+## Docker и production
+
+Корневой `Dockerfile` собирает только HTTP MCP на Node 22 и запускает его от непривилегированного пользователя. SQLite, архив снимков и версионные файлы ядра передаются через bind mount `/data`, а не вкладываются в образ.
+
+```bash
+docker build -t bitrix-mcp .
+export BITRIX_MCP_TOKEN="$(openssl rand -hex 32)"
+
+docker run --rm -p 127.0.0.1:3000:3000 \
+  --mount type=bind,src="$PWD/index.sqlite",dst=/data/index.sqlite,readonly \
+  --mount type=bind,src="$PWD/index.sqlite.snapshots",dst=/data/index.sqlite.snapshots,readonly \
+  --mount type=bind,src="/path/to/www/bitrix",dst=/data/core,readonly \
+  -e BITRIX_MCP_TOKEN \
+  bitrix-mcp
+```
+
+`BITRIX_CORE_ROOT=/data/core` заменяет путь индексирующей машины для runtime-проверок `stale`. Полное ядро монтировать необязательно: достаточно `modules/main/classes/general/version.php` и всех `modules/<module>/install/version.php` с сохранением путей — остальные факты MCP читает из SQLite.
+
 ## Инструменты
 
 | Инструмент | Назначение |

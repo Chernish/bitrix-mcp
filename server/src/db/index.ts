@@ -97,8 +97,11 @@ export class IndexDatabase {
       : undefined;
   }
 
-  /** Абсолютный путь корня ядра, записанный при индексации. */
+  /** Путь корня ядра для runtime-проверок версий. */
   coreRoot(): string | null {
+    const override = process.env.BITRIX_CORE_ROOT?.trim();
+    if (override) return override;
+
     const row = this.db
       .prepare('SELECT path FROM index_root WHERE is_core = 1 LIMIT 1')
       .get() as { path: string } | undefined;

@@ -1,4 +1,4 @@
-import { test, describe, after } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,8 +24,20 @@ import { INDEX_PATH, indexAvailable } from '../helpers.ts';
  */
 describe('Обнаружение рассинхрона', { skip: !indexAvailable() }, () => {
   const temps: string[] = [];
+  const previousCoreRoot = process.env.BITRIX_CORE_ROOT;
 
-  after(() => temps.forEach((p) => rmSync(p, { recursive: true, force: true })));
+  before(() => {
+    delete process.env.BITRIX_CORE_ROOT;
+  });
+
+  after(() => {
+    if (previousCoreRoot === undefined) {
+      delete process.env.BITRIX_CORE_ROOT;
+    } else {
+      process.env.BITRIX_CORE_ROOT = previousCoreRoot;
+    }
+    temps.forEach((p) => rmSync(p, { recursive: true, force: true }));
+  });
 
   function fakeCore(smVersion: string, modules: Record<string, string>): string {
     const dir = mkdtempSync(join(tmpdir(), 'bitrix-mcp-core-'));
@@ -65,6 +77,25 @@ describe('Обнаружение рассинхрона', { skip: !indexAvailabl
     const core = fakeCore('25.100.300', {});
 
     assert.equal(readCurrentSmVersion(core), '25.100.300');
+  });
+
+  test('BITRIX_CORE_ROOT заменяет путь из индекса для runtime-проверок', () => {
+    const core = fakeCore('26.800.0', {});
+    const idx = indexPointingAt('/recorded/core');
+    const previous = process.env.BITRIX_CORE_ROOT;
+    process.env.BITRIX_CORE_ROOT = core;
+    const db = new IndexDatabase(idx);
+
+    try {
+      assert.equal(db.coreRoot(), core);
+    } finally {
+      db.close();
+      if (previous === undefined) {
+        delete process.env.BITRIX_CORE_ROOT;
+      } else {
+        process.env.BITRIX_CORE_ROOT = previous;
+      }
+    }
   });
 
   test('совпадение версии сборки означает отсутствие рассинхрона', () => {
