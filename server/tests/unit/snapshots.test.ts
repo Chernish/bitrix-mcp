@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 
-import { IndexDatabase } from '../../src/db/index.ts';
+import { IndexDatabase, SUPPORTED_SCHEMA_VERSION } from '../../src/db/index.ts';
 import { buildProvenance } from '../../src/envelope.ts';
 import { hashFile, resolveSnapshotIndex, SnapshotCatalogError } from '../../src/snapshots.ts';
 import type { SnapshotMetadata } from '../../src/snapshots.ts';
@@ -50,12 +50,13 @@ describe('Версионные снимки индекса', () => {
         docs_source_revision TEXT
       );
       CREATE TABLE index_root (id INTEGER PRIMARY KEY, path TEXT, label TEXT, is_core INTEGER);
+      CREATE TABLE module (code TEXT, version TEXT, rel_path TEXT);
     `);
     db.prepare(`
       INSERT INTO snapshot VALUES (
-        1, ?, NULL, ?, 'test', 9, 0, 0, 0, 1, NULL, 'git', ?
+        1, ?, NULL, ?, 'test', ?, 0, 0, 0, 1, NULL, 'git', ?
       )
-    `).run(version, indexedAt, `docs-${version}`);
+    `).run(version, indexedAt, SUPPORTED_SCHEMA_VERSION, `docs-${version}`);
     db.close();
   }
 

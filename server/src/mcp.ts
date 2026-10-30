@@ -6,6 +6,7 @@ import {
 
 import type { IndexDatabase } from './db/index.ts';
 import { createRegistry, toolByName } from './tools/registry.ts';
+import { validateToolArguments } from './validation.ts';
 
 export interface McpInstance {
   server: Server;
@@ -40,8 +41,20 @@ export function createMcpInstance(
       };
     }
 
+    const args = request.params.arguments ?? {};
+    const validationError = validateToolArguments(tool.inputSchema, args);
+
+    if (validationError) {
+      return {
+        isError: true,
+        content: [
+          { type: 'text' as const, text: `Некорректные аргументы ${tool.name}: ${validationError}` },
+        ],
+      };
+    }
+
     try {
-      const result = tool.handler(request.params.arguments ?? {});
+      const result = tool.handler(args);
 
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],

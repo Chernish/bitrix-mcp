@@ -82,6 +82,7 @@ export interface LookupOptions {
   module?: string;
   kind?: string;
   limit?: number;
+  allowPrefix?: boolean;
 }
 
 export interface LookupResult {
@@ -94,7 +95,8 @@ export interface LookupResult {
  * Поиск символа по имени.
  *
  * Порядок: точное совпадение полного имени → точное совпадение короткого →
- * разрешение псевдонима class_alias → префиксное совпадение.
+ * разрешение псевдонима class_alias. Префиксный поиск доступен только через
+ * allowPrefix, чтобы исследовательский поиск не подменял фактическую проверку.
  *
  * Разрешение псевдонимов обязательно: \Bitrix\Sale\OrderTable — форма,
  * которой пользуются повсеместно, но объявления с таким именем в ядре нет
@@ -162,8 +164,8 @@ export function lookupSymbol(
     }
   }
 
-  // 4. Префикс.
-  if (rows.length === 0) {
+  // 4. Префикс — только для поискового инструмента, не для проверки фактов.
+  if (rows.length === 0 && options.allowPrefix === true) {
     rows = db.all<RawSymbol>(
       `${SELECT_SYMBOL} WHERE s.short_name_lower LIKE ?${and} ORDER BY LENGTH(s.short_name), m.code LIMIT ?`,
       [needle + '%', ...extra, limit * 4],

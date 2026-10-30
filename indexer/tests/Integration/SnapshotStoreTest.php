@@ -78,6 +78,19 @@ final class SnapshotStoreTest extends TestCase
         self::assertSame([], glob($this->indexPath . '.staging-*.sqlite') ?: []);
     }
 
+    public function testFailedUpdateDoesNotChangeActiveSnapshot(): void
+    {
+        $store = new SnapshotStore($this->indexPath);
+        $beforeHash = hash_file('sha256', $this->indexPath);
+        $before = $store->list();
+        file_put_contents($this->coreDir . '/modules/testmod/lib/broken.php', "<?php\nclass Broken {\n");
+
+        self::assertSame(ExitCode::ParseErrorThreshold, $this->update());
+        self::assertSame($beforeHash, hash_file('sha256', $this->indexPath));
+        self::assertSame($before, $store->list());
+        self::assertSame([], glob($this->indexPath . '.staging-*.sqlite') ?: []);
+    }
+
     public function testRepeatedVersionGetsNewIdAndActiveCannotBeDeleted(): void
     {
         $store = new SnapshotStore($this->indexPath);
@@ -122,6 +135,47 @@ final class SnapshotStoreTest extends TestCase
 
         $archive = $this->pdo($this->archivePath($second));
         self::assertSame('docs-B', $this->scalar($archive, 'SELECT docs_source_revision FROM snapshot WHERE id = 1'));
+    }
+
+    public function testParallelArchivesDoNotLoseCatalogEntries(): void
+    {
+        $processes = [];
+        $command = [
+            PHP_BINARY,
+            '-d',
+            'short_open_tag=1',
+            dirname(__DIR__, 2) . '/bin/index.php',
+            'build',
+            '--core=' . $this->coreDir,
+            '--index=' . $this->indexPath,
+        ];
+
+        for ($i = 0; $i < 21; $i++) {
+            $process = proc_open(
+                $command,
+                [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']],
+                $pipes,
+            );
+            self::assertIsResource($process);
+            fclose($pipes[0]);
+            $processes[] = [$process, $pipes[1], $pipes[2]];
+        }
+
+        foreach ($processes as [$process, $stdout, $stderr]) {
+            $output = stream_get_contents($stdout) . stream_get_contents($stderr);
+            fclose($stdout);
+            fclose($stderr);
+            self::assertSame(0, proc_close($process), $output);
+        }
+
+        $store = new SnapshotStore($this->indexPath);
+        $snapshots = $store->list()['snapshots'];
+        self::assertCount(22, $snapshots);
+        self::assertCount(22, array_unique(array_column($snapshots, 'id')));
+
+        foreach ($snapshots as $metadata) {
+            self::assertSame($metadata['id'], $store->metadata($metadata['id'])['id']);
+        }
     }
 
     private function changeCore(): void

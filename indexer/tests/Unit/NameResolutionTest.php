@@ -53,6 +53,30 @@ final class NameResolutionTest extends TestCase
         self::assertSame(['\Vendor\Lib\Contracts\Speaks'], $symbol->interfaces);
     }
 
+    public function testResolvesTraitImports(): void
+    {
+        $code = <<<'PHP'
+        <?php
+        namespace App\Domain;
+
+        use Vendor\Lib\Concerns\LogsActivity as Logs;
+        use Vendor\Lib\Concerns\TracksChanges;
+
+        class Widget
+        {
+            use Logs;
+            use TracksChanges;
+        }
+        PHP;
+
+        [$extraction] = $this->extractor->extract($code);
+        self::assertNotNull($extraction);
+        self::assertSame(
+            ['\\Vendor\\Lib\\Concerns\\LogsActivity', '\\Vendor\\Lib\\Concerns\\TracksChanges'],
+            $extraction->symbols[0]->traits,
+        );
+    }
+
     public function testResolvesRelativeNamesAgainstCurrentNamespace(): void
     {
         $code = <<<'PHP'

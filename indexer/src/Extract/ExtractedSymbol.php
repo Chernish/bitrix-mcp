@@ -12,6 +12,7 @@ final readonly class ExtractedSymbol
      * @param list<string> $interfaces полные имена реализуемых интерфейсов
      * @param list<ExtractedMethod> $methods
      * @param list<ExtractedConstant> $constants
+     * @param list<string> $traits полные имена используемых трейтов
      */
     public function __construct(
         public string $fqn,
@@ -30,6 +31,7 @@ final readonly class ExtractedSymbol
         public int $line,
         public array $methods,
         public array $constants,
+        public array $traits = [],
         /** Заполнено, если класс объявляет getMap() — то есть является ORM-сущностью. */
         public ?ExtractedOrmEntity $orm = null,
     ) {

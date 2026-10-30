@@ -46,6 +46,17 @@ final class AliasResolutionTest extends IndexBuildTestCase
         self::assertSame('\Test\Mod\Thing', $target, 'Поиск псевдонима по короткому имени не работает');
     }
 
+    public function testTraitsAreRecordedWithResolvedNames(): void
+    {
+        $rows = $this->query(
+            'SELECT t.trait_fqn FROM symbol_trait t
+             JOIN symbol s ON s.id = t.symbol_id WHERE s.short_name = ?',
+            ['Thing'],
+        );
+
+        self::assertSame(['\\Test\\Mod\\Concerns\\LogsActivity'], array_column($rows, 'trait_fqn'));
+    }
+
     public function testInterfacesAreRecorded(): void
     {
         $rows = $this->query(

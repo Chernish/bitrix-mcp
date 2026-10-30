@@ -74,6 +74,41 @@ final class IncrementalUpdateTest extends TestCase
         );
     }
 
+    public function testCodeSearchIndexFollowsChangedFiles(): void
+    {
+        $path = $this->coreDir . '/modules/testmod/lib/searchable.php';
+        file_put_contents(
+            $path,
+            "<?php\n/** Uniqueoldtoken describes an API that is present in the original core. */\n"
+            . "class SearchableOldApi {}\n",
+        );
+
+        self::assertSame(ExitCode::Success, $this->build());
+        self::assertSame(
+            '\\SearchableOldApi',
+            $this->scalar('SELECT fqn FROM fts_code WHERE fts_code MATCH ?', ['Uniqueoldtoken']),
+        );
+
+        file_put_contents(
+            $path,
+            "<?php\n/** Uniquefreshtoken describes an API that is present in the updated core. */\n"
+            . "class SearchableFreshApi {}\n",
+        );
+        touch($path, time() + 10);
+
+        self::assertSame(ExitCode::Success, $this->update());
+        self::assertSame(
+            0,
+            (int)$this->scalar('SELECT COUNT(*) FROM fts_code WHERE fts_code MATCH ?', ['Uniqueoldtoken']),
+            'Удалённый класс остался в полнотекстовом поиске',
+        );
+        self::assertSame(
+            '\\SearchableFreshApi',
+            $this->scalar('SELECT fqn FROM fts_code WHERE fts_code MATCH ?', ['Uniquefreshtoken']),
+            'Новый класс не появился в полнотекстовом поиске',
+        );
+    }
+
     public function testDeletedFileRemovesItsRecords(): void
     {
         self::assertNotNull($this->findSymbol('Thing'));
@@ -139,6 +174,81 @@ final class IncrementalUpdateTest extends TestCase
         self::assertSame('99.200.0', $this->scalar('SELECT version FROM module WHERE code = ?', ['main']));
     }
 
+    public function testMovedCoreReplacesOldRootAndModules(): void
+    {
+        $moved = $this->coreDir . '-moved';
+        self::assertTrue(rename($this->coreDir, $moved));
+        $this->coreDir = $moved;
+
+        file_put_contents(
+            $this->coreDir . '/modules/testmod/install/version.php',
+            "<?php\n\$arModuleVersion = [\"VERSION\" => \"99.0.0\"];\n",
+        );
+
+        self::assertSame(ExitCode::Success, $this->update());
+        self::assertSame(1, (int)$this->scalar('SELECT COUNT(*) FROM index_root'));
+        self::assertSame(realpath($this->coreDir), $this->scalar('SELECT path FROM index_root'));
+        self::assertSame(1, (int)$this->scalar('SELECT COUNT(*) FROM module WHERE code = ?', ['testmod']));
+        self::assertSame('99.0.0', $this->scalar('SELECT version FROM module WHERE code = ?', ['testmod']));
+        self::assertGreaterThan(
+            0,
+            (int)$this->scalar(
+                'SELECT COUNT(*) FROM file f JOIN module m ON m.id = f.module_id WHERE m.code = ?',
+                ['testmod'],
+            ),
+        );
+    }
+
+    public function testRemovedModuleIsDeletedWithItsFiles(): void
+    {
+        $this->removeTree($this->coreDir . '/modules/testmod');
+
+        self::assertSame(ExitCode::Success, $this->update());
+        self::assertSame(0, (int)$this->scalar('SELECT COUNT(*) FROM module WHERE code = ?', ['testmod']));
+        self::assertSame(0, (int)$this->scalar('SELECT COUNT(*) FROM file WHERE module_id NOT IN (SELECT id FROM module)'));
+    }
+
+    public function testDependenciesFollowTheirSourceFiles(): void
+    {
+        $first = $this->coreDir . '/modules/testmod/lib/dependency-a.php';
+        $second = $this->coreDir . '/modules/testmod/lib/dependency-b.php';
+        $include = "\\Bitrix\\Main\\Loader::includeModule('sale');\n";
+        file_put_contents($first, "<?php\n" . $include . $include);
+        file_put_contents($second, "<?php\n" . $include);
+
+        self::assertSame(ExitCode::Success, $this->update());
+        self::assertSame(
+            2,
+            (int)$this->scalar(
+                'SELECT SUM(occurrences) FROM module_dependency d
+                 JOIN module m ON m.id = d.module_id WHERE m.code = ? AND d.depends_on_code = ?',
+                ['testmod', 'sale'],
+            ),
+        );
+
+        unlink($first);
+        self::assertSame(ExitCode::Success, $this->update());
+        self::assertSame(
+            1,
+            (int)$this->scalar(
+                'SELECT SUM(occurrences) FROM module_dependency d
+                 JOIN module m ON m.id = d.module_id WHERE m.code = ? AND d.depends_on_code = ?',
+                ['testmod', 'sale'],
+            ),
+        );
+
+        unlink($second);
+        self::assertSame(ExitCode::Success, $this->update());
+        self::assertSame(
+            0,
+            (int)$this->scalar(
+                'SELECT COUNT(*) FROM module_dependency d
+                 JOIN module m ON m.id = d.module_id WHERE m.code = ? AND d.depends_on_code = ?',
+                ['testmod', 'sale'],
+            ),
+        );
+    }
+
     /**
      * Регрессия: инкрементальный прогон не имеет права обнулить счётчик
      * ошибок разбора.
@@ -165,8 +275,9 @@ final class IncrementalUpdateTest extends TestCase
         self::assertSame(1, $rows, 'Ошибка разбора не записана в таблицу');
         self::assertSame(1, $counter, 'Счётчик в снимке разошёлся с таблицей сразу после сборки');
 
-        // Обновление без изменений: переразбирать нечего.
-        self::assertSame(ExitCode::Success, $this->update());
+        // Обновление без изменений перечитывает сохранённые ошибки и тоже
+        // отклоняет индекс выше порога, хотя переразбирать файлы не потребовалось.
+        self::assertSame(ExitCode::ParseErrorThreshold, $this->update());
 
         self::assertSame(
             1,

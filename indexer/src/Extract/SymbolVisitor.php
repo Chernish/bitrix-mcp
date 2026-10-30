@@ -39,7 +39,7 @@ final class SymbolVisitor extends NodeVisitorAbstract
         return null;
     }
 
-    public function enterNode(Node $node): ?int
+    public function leaveNode(Node $node): ?int
     {
         if (!$node instanceof ClassLike) {
             return null;
@@ -74,6 +74,7 @@ final class SymbolVisitor extends NodeVisitorAbstract
             line: $node->getStartLine(),
             methods: $this->methodsOf($node),
             constants: $this->constantsOf($node),
+            traits: $this->traitsOf($node),
             orm: $this->orm->extract($node),
         );
 
@@ -128,6 +129,20 @@ final class SymbolVisitor extends NodeVisitorAbstract
             static fn(Node\Name $n): string => '\\' . $n->toString(),
             $names,
         ));
+    }
+
+    /** @return list<string> */
+    private function traitsOf(ClassLike $node): array
+    {
+        $names = [];
+
+        foreach ($node->getTraitUses() as $use) {
+            foreach ($use->traits as $trait) {
+                $names[] = '\\' . $trait->toString();
+            }
+        }
+
+        return $names;
     }
 
     /** @return list<ExtractedMethod> */

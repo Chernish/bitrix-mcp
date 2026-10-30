@@ -26,6 +26,7 @@ final class SymbolWriter
 {
     private ?PDOStatement $insertSymbol = null;
     private ?PDOStatement $insertInterface = null;
+    private ?PDOStatement $insertTrait = null;
     private ?PDOStatement $insertMethod = null;
     private ?PDOStatement $insertParameter = null;
     private ?PDOStatement $insertAlias = null;
@@ -83,7 +84,7 @@ final class SymbolWriter
         }
 
         foreach ($extraction->dependencies as $code) {
-            $this->writeDependency($moduleId, $code);
+            $this->writeDependency($moduleId, $fileId, $code);
         }
 
         if ($extraction->component !== null) {
@@ -111,21 +112,21 @@ final class SymbolWriter
         $this->restCount++;
     }
 
-    /**
-     * Зависимость пишется через UPSERT: один модуль подключает другой
-     * из множества файлов, и нас интересует факт связи плюс её частота,
-     * а не каждая точка вызова.
-     */
-    private function writeDependency(int $moduleId, string $code): void
+    /** Зависимость сохраняет источник, чтобы каскад файла удалял и сам факт связи. */
+    private function writeDependency(int $moduleId, int $fileId, string $code): void
     {
         $this->insertDependency ??= $this->pdo->prepare(
-            'INSERT INTO module_dependency (module_id, depends_on_code, occurrences)
-             VALUES (:module_id, :code, 1)
-             ON CONFLICT (module_id, depends_on_code)
+            'INSERT INTO module_dependency (module_id, file_id, depends_on_code, occurrences)
+             VALUES (:module_id, :file_id, :code, 1)
+             ON CONFLICT (module_id, file_id, depends_on_code)
              DO UPDATE SET occurrences = occurrences + 1'
         );
 
-        $this->insertDependency->execute([':module_id' => $moduleId, ':code' => $code]);
+        $this->insertDependency->execute([
+            ':module_id' => $moduleId,
+            ':file_id' => $fileId,
+            ':code' => $code,
+        ]);
     }
 
     private function writeComponent(ExtractedComponent $component, int $moduleId, int $fileId): void
@@ -241,6 +242,19 @@ final class SymbolWriter
 
         foreach ($symbol->interfaces as $interface) {
             $this->insertInterface->execute([':sid' => $symbolId, ':fqn' => $interface]);
+        }
+
+        $this->insertTrait ??= $this->pdo->prepare(
+            'INSERT INTO symbol_trait (symbol_id, trait_fqn, trait_fqn_lower)
+             VALUES (:sid, :fqn, :fqn_lower)'
+        );
+
+        foreach ($symbol->traits as $trait) {
+            $this->insertTrait->execute([
+                ':sid' => $symbolId,
+                ':fqn' => $trait,
+                ':fqn_lower' => mb_strtolower($trait),
+            ]);
         }
 
         $this->insertConstant ??= $this->pdo->prepare(

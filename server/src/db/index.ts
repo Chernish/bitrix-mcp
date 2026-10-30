@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import type { SnapshotRole } from '../types.ts';
 
 /** Версия схемы, которую понимает этот сервер. Должна совпадать с Schema::VERSION индексатора. */
-export const SUPPORTED_SCHEMA_VERSION = 9;
+export const SUPPORTED_SCHEMA_VERSION = 11;
 
 export interface Snapshot {
   sm_version: string | null;

@@ -1,5 +1,6 @@
 import type { IndexDatabase } from '../db/index.ts';
 import type { ToolDefinition } from '../types.ts';
+import { constrainToolSchema } from '../validation.ts';
 import { findSymbolTool } from './find-symbol.ts';
 import { getClassTool } from './get-class.ts';
 import { checkMethodTool } from './check-method.ts';
@@ -37,7 +38,7 @@ import { findNamespaceTool } from './find-namespace.ts';
  * под все контрактные проверки.
  */
 export function createRegistry(db: IndexDatabase): ToolDefinition[] {
-  return [
+  const tools = [
     findSymbolTool(db),
     getClassTool(db),
     checkMethodTool(db),
@@ -62,6 +63,8 @@ export function createRegistry(db: IndexDatabase): ToolDefinition[] {
     findNamespaceTool(db),
     indexStatusTool(db),
   ];
+
+  return tools.map(constrainToolSchema);
 }
 
 export function toolByName(registry: ToolDefinition[], name: string): ToolDefinition | undefined {

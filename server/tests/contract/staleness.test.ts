@@ -65,10 +65,17 @@ describe('Контракт №6: обнаружение рассинхрона',
       const tool = registry(db).find((t) => t.name === 'bitrix_index_status');
       assert.ok(tool);
 
-      const response = tool.handler({}) as Envelope<unknown>;
+      const response = tool.handler({ deep: true }) as Envelope<{
+        deep_check: { drifted: unknown[] };
+      }>;
 
       assert.equal(response.provenance.stale, false, 'Ложное срабатывание детекта рассинхрона');
       assert.equal(response.provenance.stale_reason, null);
+      assert.equal(
+        response.provenance.stale,
+        response.result.deep_check.drifted.length > 0,
+        'provenance противоречит подробной карте версий',
+      );
     } finally {
       db.close();
       resetStalenessCache();

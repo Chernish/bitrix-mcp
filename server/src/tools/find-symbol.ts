@@ -36,6 +36,7 @@ export function findSymbolTool(db: IndexDatabase): ToolDefinition {
         module: args.module ? String(args.module) : undefined,
         kind: args.kind ? String(args.kind) : undefined,
         limit: args.limit ? Number(args.limit) : undefined,
+        allowPrefix: true,
       });
 
       if (symbols.length === 0) {

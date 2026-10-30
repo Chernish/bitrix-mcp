@@ -29,7 +29,7 @@ final class DeterminismTest extends IndexBuildTestCase
             // Снимок сравнивать нельзя целиком: indexed_at меняется по определению.
             $tables = [
                 'module', 'symbol', 'method', 'parameter', 'symbol_alias', 'symbol_interface',
-                'global_function', 'class_constant', 'usage_reference',
+                'symbol_trait', 'global_function', 'class_constant', 'usage_reference',
             ];
 
             foreach ($tables as $table) {

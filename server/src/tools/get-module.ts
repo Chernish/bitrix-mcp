@@ -38,12 +38,12 @@ export function getModuleTool(db: IndexDatabase): ToolDefinition {
       if (!module) return notFound(db, code);
 
       const dependencies = db.all<{ code: string; occurrences: number }>(
-        `SELECT depends_on_code AS code, occurrences FROM module_dependency
-         WHERE module_id = ? ORDER BY occurrences DESC, code LIMIT ?`,
+        `SELECT depends_on_code AS code, SUM(occurrences) AS occurrences FROM module_dependency
+         WHERE module_id = ? GROUP BY depends_on_code ORDER BY occurrences DESC, code LIMIT ?`,
         [module.id, limit],
       );
       const dependencyTotal = db.count(
-        'SELECT COUNT(*) AS c FROM module_dependency WHERE module_id = ?',
+        'SELECT COUNT(DISTINCT depends_on_code) AS c FROM module_dependency WHERE module_id = ?',
         [module.id],
       );
 

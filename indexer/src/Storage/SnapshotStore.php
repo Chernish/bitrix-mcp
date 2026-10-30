@@ -89,25 +89,27 @@ final class SnapshotStore
 
     public function delete(string $id): void
     {
-        $metadata = $this->metadata($id);
-        if ($this->activeId() === $id) {
-            throw new PreflightFailure(
-                "ОШИБКА: нельзя удалить активный снимок {$id}. Сначала активируйте другой.",
-                ExitCode::ConfigError,
-            );
-        }
+        $this->withCatalogLock(function () use ($id): void {
+            $metadata = $this->metadata($id);
+            if ($this->activeId() === $id) {
+                throw new PreflightFailure(
+                    "ОШИБКА: нельзя удалить активный снимок {$id}. Сначала активируйте другой.",
+                    ExitCode::ConfigError,
+                );
+            }
 
-        $catalog = $this->readCatalog();
-        $catalog['snapshots'] = array_values(array_filter(
-            $catalog['snapshots'],
-            static fn(array $item): bool => $item['id'] !== $id,
-        ));
-        $this->writeCatalog($catalog);
+            $catalog = $this->readCatalog();
+            $catalog['snapshots'] = array_values(array_filter(
+                $catalog['snapshots'],
+                static fn(array $item): bool => $item['id'] !== $id,
+            ));
+            $this->writeCatalog($catalog);
 
-        $path = $this->path($metadata);
-        if (is_file($path) && !unlink($path)) {
-            throw new RuntimeException("не удалось удалить снимок {$path}");
-        }
+            $path = $this->path($metadata);
+            if (is_file($path) && !unlink($path)) {
+                throw new RuntimeException("не удалось удалить снимок {$path}");
+            }
+        });
     }
 
     /** @return Metadata */
@@ -284,9 +286,11 @@ final class SnapshotStore
         }
         chmod($archive, 0o444);
 
-        $catalog = $this->readCatalog();
-        $catalog['snapshots'][] = $metadata;
-        $this->writeCatalog($catalog);
+        $this->withCatalogLock(function () use ($metadata): void {
+            $catalog = $this->readCatalog();
+            $catalog['snapshots'][] = $metadata;
+            $this->writeCatalog($catalog);
+        });
 
         return $metadata;
     }
@@ -412,6 +416,31 @@ final class SnapshotStore
         );
         if (file_put_contents($temporary, $json . PHP_EOL) === false || !rename($temporary, $this->catalogPath)) {
             throw new RuntimeException("не удалось записать каталог снимков: {$this->catalogPath}");
+        }
+    }
+
+    /**
+     * @template T
+     * @param callable(): T $operation
+     * @return T
+     */
+    private function withCatalogLock(callable $operation): mixed
+    {
+        $this->ensureDirectory();
+        $lock = fopen($this->catalogPath . '.lock', 'c');
+        if ($lock === false) {
+            throw new RuntimeException("не удалось открыть блокировку каталога: {$this->catalogPath}");
+        }
+
+        try {
+            if (!flock($lock, LOCK_EX)) {
+                throw new RuntimeException("не удалось заблокировать каталог: {$this->catalogPath}");
+            }
+
+            return $operation();
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
         }
     }
 

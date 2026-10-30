@@ -169,7 +169,7 @@
 
 ### `module_dependency`
 
-`module_id`, `depends_on_code`, `min_version`.
+`module_id`, `file_id`, `depends_on_code`, `occurrences`. Ключ `(module_id, file_id, depends_on_code)` сохраняет источник каждой связи; удаление файла каскадом удаляет его зависимости. В MCP ответе записи группируются по `depends_on_code` с суммой `occurrences`.
 
 ---
 

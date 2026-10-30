@@ -5,13 +5,12 @@ import type { IndexDatabase } from './db/index.ts';
 /**
  * Обнаружение рассинхрона индекса и ядра.
  *
- * Дешёвый уровень: одно чтение файла с константами версии сборки и сверка
- * с записанным в снимке. Он ловит штатное обновление Битрикса, которое всегда
- * меняет SM_VERSION.
+ * Проверка сравнивает версию сборки и версии всех проиндексированных модулей.
+ * Результат кэшируется на пять секунд и используется как обычными ответами,
+ * так и подробной диагностикой, чтобы их флаги stale не расходились.
  *
- * Ручную правку отдельного файла ядра этот уровень не ловит — для этого есть
- * полная сверка при переиндексации. Такая правка нарушает саму модель поставки
- * и относится к сценарию, на который рассчитана команда update.
+ * Ручную правку отдельного файла ядра эта проверка не ловит — для этого есть
+ * полная сверка при переиндексации командой update.
  *
  * ВАЖНО: константы объявлены в modules/main/classes/general/version.php.
  * Файла modules/main/install/version.php в ядре НЕТ (research.md, R-013).
@@ -27,8 +26,8 @@ export interface StalenessResult {
   reason: string | null;
 }
 
-/** Кэш на время жизни процесса: файл читается не чаще, чем раз в интервал. */
-let cached: { at: number; result: StalenessResult } | null = null;
+/** Кэш на время жизни процесса: файлы версий перечитываются не чаще интервала. */
+let cached: { at: number; result: DeepStalenessResult } | null = null;
 const CACHE_MS = 5000;
 
 export function readCurrentSmVersion(coreRoot: string): string | null {
@@ -56,14 +55,9 @@ export function readCurrentSmVersion(coreRoot: string): string | null {
 }
 
 export function checkStaleness(db: IndexDatabase, now: number = Date.now()): StalenessResult {
-  if (cached && now - cached.at < CACHE_MS) {
-    return cached.result;
-  }
+  const { stale, reason } = evaluate(db, now);
 
-  const result = compute(db);
-  cached = { at: now, result };
-
-  return result;
+  return { stale, reason };
 }
 
 export function resetStalenessCache(): void {
@@ -76,55 +70,9 @@ export interface DeepStalenessResult extends StalenessResult {
   checked: number;
 }
 
-/**
- * Второй уровень: перечитывание версий всех модулей.
- *
- * Дороже дешёвой сверки (93 чтения файлов против одного), поэтому вызывается
- * по явному запросу, а не на каждый ответ. Ловит случай, который первый уровень
- * пропускает: обновление отдельного модуля без смены версии сборки.
- *
- * Третий уровень — полная сверка размеров, времён и хешей всех файлов —
- * принадлежит команде `update` индексатора: сервер только читает и не может
- * привести индекс в соответствие, а значит и обходить дерево ему незачем.
- */
+/** Тот же результат, что у обычной проверки, плюс подробная карта модулей. */
 export function checkDeepStaleness(db: IndexDatabase): DeepStalenessResult {
-  const base = compute(db);
-  const coreRoot = db.coreRoot();
-
-  if (coreRoot === null || !existsSync(coreRoot)) {
-    return { ...base, drifted: [], checked: 0 };
-  }
-
-  const indexed = db.all<{ code: string; version: string | null; rel_path: string }>(
-    'SELECT code, version, rel_path FROM module ORDER BY code',
-  );
-
-  const drifted: DeepStalenessResult['drifted'] = [];
-
-  for (const row of indexed) {
-    const current =
-      row.code === 'main'
-        ? readCurrentSmVersion(coreRoot)
-        : readModuleVersion(join(coreRoot, row.rel_path, 'install', 'version.php'));
-
-    if (current !== row.version) {
-      drifted.push({ module: row.code, indexed: row.version, current });
-    }
-  }
-
-  if (drifted.length === 0) {
-    return { ...base, drifted, checked: indexed.length };
-  }
-
-  const names = drifted.slice(0, 5).map((d) => d.module).join(', ');
-  const suffix = drifted.length > 5 ? ` и ещё ${drifted.length - 5}` : '';
-
-  return {
-    stale: true,
-    reason: base.reason ?? `версии модулей разошлись: ${names}${suffix}`,
-    drifted,
-    checked: indexed.length,
-  };
+  return evaluate(db, Date.now());
 }
 
 function readModuleVersion(path: string): string | null {
@@ -140,28 +88,66 @@ function readModuleVersion(path: string): string | null {
   }
 }
 
-function compute(db: IndexDatabase): StalenessResult {
+function evaluate(db: IndexDatabase, now: number): DeepStalenessResult {
+  if (cached && now - cached.at < CACHE_MS) {
+    return cached.result;
+  }
+
+  const result = compute(db);
+  cached = { at: now, result };
+
+  return result;
+}
+
+function compute(db: IndexDatabase): DeepStalenessResult {
   const coreRoot = db.coreRoot();
 
   if (coreRoot === null) {
-    return { stale: false, reason: null };
+    return { stale: false, reason: null, drifted: [], checked: 0 };
   }
 
   if (!existsSync(coreRoot)) {
     return {
       stale: true,
       reason: `корень ядра недоступен по записанному пути: ${coreRoot}`,
+      drifted: [],
+      checked: 0,
     };
   }
 
-  const current = readCurrentSmVersion(coreRoot);
-  const indexed = db.snapshot.sm_version;
+  const currentSm = readCurrentSmVersion(coreRoot);
+  const indexedSm = db.snapshot.sm_version;
+  const modules = db.all<{ code: string; version: string | null; rel_path: string }>(
+    'SELECT code, version, rel_path FROM module ORDER BY code',
+  );
+  const drifted: DeepStalenessResult['drifted'] = [];
+  const reasons: string[] = [];
 
-  if (current === null || indexed === null) {
-    return { stale: false, reason: null };
+  if (currentSm !== null && indexedSm !== null && currentSm !== indexedSm) {
+    reasons.push(`sm_version изменился: ${indexedSm} -> ${currentSm}`);
   }
 
-  return current === indexed
-    ? { stale: false, reason: null }
-    : { stale: true, reason: `sm_version изменился: ${indexed} -> ${current}` };
+  for (const row of modules) {
+    const current =
+      row.code === 'main'
+        ? currentSm
+        : readModuleVersion(join(coreRoot, row.rel_path, 'install', 'version.php'));
+
+    if (current !== row.version) {
+      drifted.push({ module: row.code, indexed: row.version, current });
+    }
+  }
+
+  if (drifted.length > 0) {
+    const names = drifted.slice(0, 5).map((d) => d.module).join(', ');
+    const suffix = drifted.length > 5 ? ` и ещё ${drifted.length - 5}` : '';
+    reasons.push(`версии модулей разошлись: ${names}${suffix}`);
+  }
+
+  return {
+    stale: reasons.length > 0,
+    reason: reasons.length > 0 ? reasons.join('; ') : null,
+    drifted,
+    checked: modules.length,
+  };
 }

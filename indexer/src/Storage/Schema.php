@@ -28,7 +28,7 @@ final class Schema
      * Сервер отказывается читать индекс с чужой версией (код возврата 5)
      * вместо того, чтобы истолковать данные неверно.
      */
-    public const VERSION = 9;
+    public const VERSION = 11;
 
     public static function create(PDO $pdo): void
     {
@@ -212,6 +212,12 @@ final class Schema
                 interface_fqn TEXT    NOT NULL
             )',
 
+            'CREATE TABLE IF NOT EXISTS symbol_trait (
+                symbol_id       INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+                trait_fqn       TEXT    NOT NULL,
+                trait_fqn_lower TEXT    NOT NULL
+            )',
+
             // ── Псевдонимы class_alias ───────────────────────────────────────
             // Без этой таблицы \Bitrix\Sale\OrderTable не находится, хотя
             // используется повсеместно: объявлен он как
@@ -388,9 +394,10 @@ final class Schema
             // Формальной декларации зависимостей у Битрикса нет (FR-011).
             'CREATE TABLE IF NOT EXISTS module_dependency (
                 module_id       INTEGER NOT NULL REFERENCES module(id) ON DELETE CASCADE,
+                file_id         INTEGER NOT NULL REFERENCES file(id) ON DELETE CASCADE,
                 depends_on_code TEXT    NOT NULL,
                 occurrences     INTEGER NOT NULL DEFAULT 1,
-                PRIMARY KEY (module_id, depends_on_code)
+                PRIMARY KEY (module_id, file_id, depends_on_code)
             )',
 
             // ── События ──────────────────────────────────────────────────────
@@ -472,6 +479,8 @@ final class Schema
             'CREATE INDEX IF NOT EXISTS idx_symbol_module      ON symbol(module_id)',
             'CREATE INDEX IF NOT EXISTS idx_symbol_file        ON symbol(file_id)',
             'CREATE INDEX IF NOT EXISTS idx_symbol_iface       ON symbol_interface(symbol_id)',
+            'CREATE INDEX IF NOT EXISTS idx_symbol_trait       ON symbol_trait(symbol_id)',
+            'CREATE INDEX IF NOT EXISTS idx_symbol_trait_fqn   ON symbol_trait(trait_fqn_lower)',
             'CREATE INDEX IF NOT EXISTS idx_alias_lower        ON symbol_alias(alias_fqn_lower)',
             'CREATE INDEX IF NOT EXISTS idx_alias_short_lower  ON symbol_alias(alias_short_lower)',
             'CREATE INDEX IF NOT EXISTS idx_method_symbol      ON method(symbol_id)',

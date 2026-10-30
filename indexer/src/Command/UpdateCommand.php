@@ -14,6 +14,7 @@ use BitrixMcp\Indexer\Extract\FileExtractor;
 use BitrixMcp\Indexer\Preflight\PreflightFailure;
 use BitrixMcp\Indexer\Preflight\ShortOpenTagGuard;
 use BitrixMcp\Indexer\Storage\Database;
+use BitrixMcp\Indexer\Storage\Schema;
 use BitrixMcp\Indexer\Storage\SchemaVersionGuard;
 use BitrixMcp\Indexer\Storage\SnapshotWriter;
 use BitrixMcp\Indexer\Storage\SymbolWriter;
@@ -34,6 +35,8 @@ use PDO;
  */
 final class UpdateCommand
 {
+    private const PARSE_ERROR_THRESHOLD = 0.01;
+
     public function __construct(
         private readonly ShortOpenTagGuard $guard = new ShortOpenTagGuard(),
     ) {
@@ -76,6 +79,7 @@ final class UpdateCommand
         // Шаг 2. Перечитать версии целиком.
         $build = $versions->readBuildVersion($config->coreRoot());
         $rootIds = $this->rootIds($pdo);
+        $currentRootIds = [];
         $moduleIds = [];
 
         $pdo->beginTransaction();
@@ -83,9 +87,11 @@ final class UpdateCommand
         foreach ($config->roots as $root) {
             $rootId = $rootIds[$root->path] ?? $snapshots->writeRoot($root);
             $rootIds[$root->path] = $rootId;
+            $currentRootIds[] = $rootId;
             $moduleIds[$root->path] = $this->syncModules($pdo, $rootId, $versions->readAll($root));
         }
 
+        $this->deleteRemovedRoots($pdo, $currentRootIds);
         $pdo->commit();
 
         $out->line(
@@ -166,8 +172,9 @@ final class UpdateCommand
         $pdo->commit();
         $out->progressDone();
 
-        // Шаг 4. Удалить исчезнувшие.
+        // Шаг 4. Удалить исчезнувшие и синхронизировать отдельный FTS-индекс.
         $removed = $this->deleteOrphans($pdo);
+        Schema::buildCodeIndex($pdo);
 
         $snapshots->finalize($build, $fileCount, $totalBytes, $errors, $this->guard->isEnabled());
 
@@ -183,8 +190,22 @@ final class UpdateCommand
         ));
         $out->line(sprintf('Время: %.1f с', $elapsed));
 
-        if ($errors->count() > 0) {
-            $out->line(sprintf('Ошибок разбора: %d', $errors->count()));
+        $errorStatement = $pdo->query('SELECT COUNT(*) FROM parse_error');
+        $storedErrors = $errorStatement === false ? 0 : (int)$errorStatement->fetchColumn();
+        $errorShare = $fileCount > 0 ? $storedErrors / $fileCount : 0.0;
+
+        if ($storedErrors > 0) {
+            $out->line(sprintf('Ошибок разбора: %d (%.3f%%)', $storedErrors, $errorShare * 100));
+        }
+
+        if ($errorShare > self::PARSE_ERROR_THRESHOLD) {
+            $out->line(sprintf(
+                'ОШИБКА: доля непарсибельных файлов %.2f%% превышает порог %.0f%% (SC-009).',
+                $errorShare * 100,
+                self::PARSE_ERROR_THRESHOLD * 100,
+            ));
+
+            return ExitCode::ParseErrorThreshold;
         }
 
         return ExitCode::Success;
@@ -282,7 +303,36 @@ final class UpdateCommand
             $ids[$code] = (int)$existing;
         }
 
+        $existingModules = $pdo->prepare('SELECT id, code FROM module WHERE root_id = ?');
+        $existingModules->execute([$rootId]);
+        $delete = $pdo->prepare('DELETE FROM module WHERE id = ?');
+
+        /** @var array{id: int, code: string} $row */
+        foreach ($existingModules->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (!isset($map[$row['code']])) {
+                $delete->execute([(int)$row['id']]);
+            }
+        }
+
         return $ids;
+    }
+
+    /** @param list<int> $currentRootIds */
+    private function deleteRemovedRoots(PDO $pdo, array $currentRootIds): void
+    {
+        $roots = $pdo->query('SELECT id FROM index_root');
+        $delete = $pdo->prepare('DELETE FROM index_root WHERE id = ?');
+
+        if ($roots === false) {
+            return;
+        }
+
+        /** @var array{id: int} $row */
+        foreach ($roots->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (!in_array((int)$row['id'], $currentRootIds, true)) {
+                $delete->execute([(int)$row['id']]);
+            }
+        }
     }
 
     /** @return array<string, array{id: int, size: int, mtime: int, sha256: string}> */

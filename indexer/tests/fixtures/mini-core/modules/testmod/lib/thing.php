@@ -3,6 +3,7 @@
 namespace Test\Mod;
 
 use Test\Mod\Base\Entity as BaseEntity;
+use Test\Mod\Concerns\LogsActivity;
 use Test\Mod\Contracts\Speaks;
 
 /**
@@ -15,6 +16,8 @@ use Test\Mod\Contracts\Speaks;
  */
 class Thing extends BaseEntity implements Speaks
 {
+    use LogsActivity;
+
     public const STATUS_ACTIVE = 'A';
 
     public static function findAll(array $filter = [], ?int $limit = null): array

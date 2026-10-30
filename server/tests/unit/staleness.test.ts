@@ -1,6 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -13,15 +13,9 @@ import {
   resetStalenessCache,
 } from '../../src/staleness.ts';
 import { INDEX_PATH, indexAvailable } from '../helpers.ts';
+import { indexStatusTool } from '../../src/tools/index-status.ts';
 
-/**
- * Уровни обнаружения рассинхрона.
- *
- * Первый уровень (версия сборки) выполняется на каждый ответ и потому обязан
- * быть дешёвым. Второй (карта версий модулей) ловит обновление отдельного
- * модуля, при котором версия сборки не меняется, — случай, который первый
- * уровень пропускает по построению.
- */
+/** Версии сборки и модулей проверяются совместно и возвращают согласованный stale. */
 describe('Обнаружение рассинхрона', { skip: !indexAvailable() }, () => {
   const temps: string[] = [];
   const previousCoreRoot = process.env.BITRIX_CORE_ROOT;
@@ -67,6 +61,26 @@ describe('Обнаружение рассинхрона', { skip: !indexAvailabl
 
     const writable = new Database(copy);
     writable.prepare('UPDATE index_root SET path = ? WHERE is_core = 1').run(coreDir);
+
+    if (existsSync(coreDir)) {
+      writable.prepare('UPDATE module SET version = ? WHERE code = ?').run(
+        readCurrentSmVersion(coreDir),
+        'main',
+      );
+      const modules = writable
+        .prepare("SELECT version, rel_path FROM module WHERE code <> 'main'")
+        .all() as Array<{ version: string | null; rel_path: string }>;
+
+      for (const row of modules) {
+        if (row.version === null) continue;
+        const directory = join(coreDir, row.rel_path, 'install');
+        const path = join(directory, 'version.php');
+        if (existsSync(path)) continue;
+        mkdirSync(directory, { recursive: true });
+        writeFileSync(path, `<?php\n$arModuleVersion = ["VERSION" => "${row.version}"];\n`);
+      }
+    }
+
     mutate?.(writable);
     writable.close();
 
@@ -152,8 +166,7 @@ describe('Обнаружение рассинхрона', { skip: !indexAvailabl
     }
   });
 
-  test('второй уровень ловит обновление модуля при неизменной версии сборки', () => {
-    // Именно тот случай, который первый уровень пропускает по построению.
+  test('обычный и deep-ответы ловят обновление модуля при неизменной версии сборки', () => {
     const core = fakeCore('25.100.300', { crm: '99.0.0' });
     const idx = indexPointingAt(core, (w) => {
       w.prepare("UPDATE snapshot SET sm_version = '25.100.300'").run();
@@ -164,22 +177,28 @@ describe('Обнаружение рассинхрона', { skip: !indexAvailabl
     const db = new IndexDatabase(idx);
 
     try {
-      assert.equal(
-        checkStaleness(db).stale,
-        false,
-        'Первый уровень не должен видеть расхождение: версия сборки не менялась',
-      );
+      const regular = checkStaleness(db);
+      assert.equal(regular.stale, true, 'Обычный ответ обязан обнаружить расхождение модуля');
+      assert.match(String(regular.reason), /версии модулей разошлись:.*crm/);
 
-      resetStalenessCache();
       const deep = checkDeepStaleness(db);
 
-      assert.equal(deep.stale, true, 'Второй уровень обязан обнаружить расхождение версий модулей');
+      assert.equal(deep.stale, regular.stale, 'Обычная и deep-проверки противоречат друг другу');
+      assert.equal(deep.reason, regular.reason);
       assert.ok(deep.checked > 0);
 
       const crm = deep.drifted.find((d) => d.module === 'crm');
       assert.ok(crm, 'Разошедшийся модуль не попал в отчёт');
       assert.equal(crm.indexed, '24.1300.0');
       assert.equal(crm.current, '99.0.0');
+
+      const status = indexStatusTool(db).handler({ deep: true }) as {
+        provenance: { stale: boolean; stale_reason: string | null };
+        result: { deep_check: { drifted: unknown[] } };
+      };
+      assert.equal(status.provenance.stale, true);
+      assert.equal(status.provenance.stale_reason, regular.reason);
+      assert.equal(status.result.deep_check.drifted.length, deep.drifted.length);
     } finally {
       db.close();
       resetStalenessCache();

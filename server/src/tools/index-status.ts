@@ -70,8 +70,9 @@ export function indexStatusTool(db: IndexDatabase): ToolDefinition {
         },
       };
 
-      if (args.deep === true) {
-        const deep = checkDeepStaleness(db);
+      const deep = args.deep === true ? checkDeepStaleness(db) : undefined;
+
+      if (deep) {
         payload.deep_check = {
           modules_checked: deep.checked,
           drifted: deep.drifted,
@@ -88,7 +89,7 @@ export function indexStatusTool(db: IndexDatabase): ToolDefinition {
           .map((m) => m.code);
       }
 
-      return envelope(db, payload);
+      return envelope(db, payload, {}, deep);
     },
   };
 }

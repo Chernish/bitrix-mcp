@@ -103,9 +103,9 @@
 
 **Вход**: `class` (обязательно), `method` (обязательно).
 
-**Выход**: `{ exists: bool, class_exists: bool, fqn, canonical_fqn, module, module_version, signature, is_static, visibility, is_deprecated, file, line }`.
+**Выход**: `{ exists: bool, class_exists: bool, fqn, canonical_fqn, declared_in, module, module_version, signature, is_static, visibility, is_deprecated, file, line }`.
 
-Различение `exists` и `class_exists` даёт агенту точный диагноз: неверный класс или неверный метод в верном классе.
+Различение `exists` и `class_exists` даёт агенту точный диагноз: неверный класс или неверный метод в верном классе. Класс разрешается только точно (включая `class_alias`), без подмены похожим именем. Метод ищется с учётом трейтов и родительской цепочки; `declared_in`, `file`, `line`, `module` и `module_version` относятся к его фактическому объявлению.
 
 ---
 

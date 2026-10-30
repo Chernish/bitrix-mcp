@@ -74,6 +74,25 @@ describe('HTTP MCP с Bearer-авторизацией', { skip: !indexAvailable(
     assert.equal(logs.join('\n').includes(TOKEN), false);
   });
 
+  test('невалидные аргументы отклоняются до обработчика', async () => {
+    const transport = new StreamableHTTPClientTransport(url, {
+      requestInit: { headers: { Authorization: `Bearer ${TOKEN}` } },
+    });
+    const client = new Client({ name: 'http-validation-test', version: '1.0.0' });
+
+    try {
+      await client.connect(transport);
+
+      for (const args of [{}, { fqn: 'IblockTable', limit: -1 }]) {
+        const response = await client.callTool({ name: 'bitrix_get_class', arguments: args });
+        assert.equal(response.isError, true);
+        assert.match(response.content[0].text, /Некорректные аргументы/);
+      }
+    } finally {
+      await client.close();
+    }
+  });
+
   test('отсутствующий и неверный токен отклоняются до разбора JSON', async () => {
     for (const token of [undefined, 'wrong']) {
       const response = await post('{not-json', token);

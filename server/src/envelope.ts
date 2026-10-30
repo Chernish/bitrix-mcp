@@ -1,5 +1,6 @@
 import type { IndexDatabase } from './db/index.ts';
 import { checkStaleness } from './staleness.ts';
+import type { StalenessResult } from './staleness.ts';
 import type { Envelope, NotFound, NotFoundReason, Provenance } from './types.ts';
 
 /**
@@ -18,8 +19,9 @@ export interface ModuleAttribution {
 export function buildProvenance(
   db: IndexDatabase,
   attribution: ModuleAttribution = {},
+  staleness?: StalenessResult,
 ): Provenance {
-  const { stale, reason } = checkStaleness(db);
+  const { stale, reason } = staleness ?? checkStaleness(db);
 
   const provenance: Provenance = {
     sm_version: db.snapshot.sm_version,
@@ -50,8 +52,9 @@ export function envelope<T>(
   db: IndexDatabase,
   result: T,
   attribution: ModuleAttribution = {},
+  staleness?: StalenessResult,
 ): Envelope<T> {
-  return { provenance: buildProvenance(db, attribution), result };
+  return { provenance: buildProvenance(db, attribution, staleness), result };
 }
 
 /**
