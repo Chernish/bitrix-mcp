@@ -112,6 +112,55 @@ final class EventExtractionTest extends TestCase
         self::assertSame('onSaleOrderSaved', $events[0]->name);
     }
 
+    public function testCompatibleRegistrationAndUnrelatedEventClass(): void
+    {
+        $events = $this->eventsOf(<<<'PHP'
+        <?php
+        namespace Demo;
+
+        use Bitrix\Main\Event;
+        use Bitrix\Main\EventManager;
+
+        $event = new Event('sale', 'OnSaleOrderSaved');
+        $unrelated = new \Custom\Event('sale', 'NotABitrixEvent');
+        EventManager::getInstance()->registerEventHandlerCompatible(
+            'sale',
+            'OnSaleOrderSaved',
+            'demo',
+            Handler::class,
+            'run'
+        );
+        PHP);
+
+        self::assertCount(2, $events);
+        self::assertSame(ExtractedEvent::KIND_SEND, $events[0]->kind);
+        self::assertSame('OnSaleOrderSaved', $events[0]->name);
+        self::assertSame(ExtractedEvent::KIND_REGISTER, $events[1]->kind);
+        self::assertSame('OnSaleOrderSaved', $events[1]->name);
+    }
+
+    public function testUnrelatedMethodReceiverDoesNotCreateEventRegistration(): void
+    {
+        $events = $this->eventsOf(<<<'PHP'
+        <?php
+        class CustomManager
+        {
+            public function addEventHandler($module, $name): void
+            {
+            }
+
+            public function boot(): void
+            {
+                $this->addEventHandler('testmod', 'OnAuditFake');
+            }
+        }
+
+        (new CustomManager())->addEventHandler('testmod', 'OnAuditFake');
+        PHP);
+
+        self::assertSame([], $events);
+    }
+
     public function testDynamicEventNameIsNotGuessed(): void
     {
         $events = $this->eventsOf(<<<'PHP'

@@ -7,7 +7,6 @@ namespace BitrixMcp\Indexer\Extract\Orm;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\ClassMethod;
-use PhpParser\NodeFinder;
 
 /**
  * Извлечение ORM-сущности из объявления класса.
@@ -22,13 +21,10 @@ use PhpParser\NodeFinder;
  */
 final class OrmExtractor
 {
-    private readonly NodeFinder $finder;
-
     public function __construct(
         private readonly ArrayMapParser $arrayParser = new ArrayMapParser(),
         private readonly FluentMapParser $fluentParser = new FluentMapParser(),
     ) {
-        $this->finder = new NodeFinder();
     }
 
     public function extract(ClassLike $node): ?ExtractedOrmEntity
@@ -48,7 +44,7 @@ final class OrmExtractor
                 tableNameSource: $tableSource,
                 extractionStyle: 'unresolved',
                 isComplete: false,
-                incompleteReason: 'тело getMap() не содержит возврата массива, разобрать статически нельзя',
+                incompleteReason: 'тело getMap() не содержит единственного статически разрешимого возврата массива',
                 fields: [],
             );
         }
@@ -204,14 +200,41 @@ final class OrmExtractor
 
     private function findReturnExpression(ClassMethod $method): ?Node\Expr
     {
-        if ($method->stmts === null) {
-            return null;
+        $returns = $this->findReturns($method->stmts ?? []);
+
+        return count($returns) === 1 ? $returns[0]->expr : null;
+    }
+
+    /**
+     * @param array<Node> $nodes
+     * @return list<Node\Stmt\Return_>
+     */
+    private function findReturns(array $nodes): array
+    {
+        $result = [];
+
+        foreach ($nodes as $node) {
+            if ($node instanceof Node\FunctionLike || $node instanceof ClassLike) {
+                continue;
+            }
+
+            if ($node instanceof Node\Stmt\Return_) {
+                $result[] = $node;
+                continue;
+            }
+
+            foreach ($node->getSubNodeNames() as $name) {
+                $value = $node->{$name};
+                if ($value instanceof Node) {
+                    $result = array_merge($result, $this->findReturns([$value]));
+                } elseif (is_array($value)) {
+                    $children = array_filter($value, static fn($item): bool => $item instanceof Node);
+                    $result = array_merge($result, $this->findReturns(array_values($children)));
+                }
+            }
         }
 
-        /** @var Node\Stmt\Return_|null $return */
-        $return = $this->finder->findFirstInstanceOf($method->stmts, Node\Stmt\Return_::class);
-
-        return $return?->expr;
+        return $result;
     }
 
     private function isArrayMergeWithParent(Node\Expr $expr): bool

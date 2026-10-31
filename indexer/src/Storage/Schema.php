@@ -28,7 +28,7 @@ final class Schema
      * Сервер отказывается читать индекс с чужой версией (код возврата 5)
      * вместо того, чтобы истолковать данные неверно.
      */
-    public const VERSION = 11;
+    public const VERSION = 12;
 
     public static function create(PDO $pdo): void
     {
@@ -216,6 +216,19 @@ final class Schema
                 symbol_id       INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
                 trait_fqn       TEXT    NOT NULL,
                 trait_fqn_lower TEXT    NOT NULL
+            )',
+
+            'CREATE TABLE IF NOT EXISTS symbol_trait_adaptation (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol_id         INTEGER NOT NULL REFERENCES symbol(id) ON DELETE CASCADE,
+                trait_fqn         TEXT    NOT NULL,
+                trait_fqn_lower   TEXT    NOT NULL,
+                method_name       TEXT    NOT NULL,
+                method_name_lower TEXT    NOT NULL,
+                alias             TEXT,
+                alias_lower       TEXT,
+                visibility        TEXT,
+                is_excluded       INTEGER NOT NULL DEFAULT 0
             )',
 
             // ── Псевдонимы class_alias ───────────────────────────────────────

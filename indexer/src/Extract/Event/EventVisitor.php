@@ -47,6 +47,7 @@ final class EventVisitor extends NodeVisitorAbstract
         'addeventhandler' => 'EventManager',
         'addeventhandlercompatible' => 'EventManager',
         'registereventhandler' => 'EventManager',
+        'registereventhandlercompatible' => 'EventManager',
     ];
 
     /** @var list<ExtractedEvent> */
@@ -74,10 +75,13 @@ final class EventVisitor extends NodeVisitorAbstract
 
         if ($node instanceof Node\Expr\New_) {
             $this->handleNewEvent($node);
-
-            return null;
         }
 
+        return null;
+    }
+
+    public function leaveNode(Node $node): ?int
+    {
         if ($node instanceof Node\Expr\MethodCall || $node instanceof Node\Expr\StaticCall) {
             $this->handleMethodCall($node);
         }
@@ -114,22 +118,13 @@ final class EventVisitor extends NodeVisitorAbstract
         $this->record($call->args, $kind, $style, $call->getStartLine());
     }
 
-    /**
-     * D7: `new Event('module', 'EventName', $params)`.
-     *
-     * Имя класса проверяется по короткому имени, потому что после NameResolver
-     * оно может быть как \Bitrix\Main\Event, так и локальным подклассом.
-     */
+    /** D7: `new Event('module', 'EventName', $params)`. */
     private function handleNewEvent(Node\Expr\New_ $new): void
     {
-        if (!$new->class instanceof Node\Name) {
-            return;
-        }
-
-        $parts = $new->class->getParts();
-        $short = strtolower((string)($parts[count($parts) - 1] ?? ''));
-
-        if ($short !== 'event') {
+        if (
+            !$new->class instanceof Node\Name
+            || strtolower('\\' . ltrim($new->class->toString(), '\\')) !== '\\bitrix\\main\\event'
+        ) {
             return;
         }
 
@@ -138,7 +133,7 @@ final class EventVisitor extends NodeVisitorAbstract
 
     private function handleMethodCall(Node\Expr\MethodCall|Node\Expr\StaticCall $call): void
     {
-        if (!$call->name instanceof Node\Identifier) {
+        if (!$call->name instanceof Node\Identifier || !$this->isEventManagerCall($call)) {
             return;
         }
 
@@ -149,6 +144,26 @@ final class EventVisitor extends NodeVisitorAbstract
         }
 
         $this->record($call->args, ExtractedEvent::KIND_REGISTER, $style, $call->getStartLine());
+    }
+
+    private function isEventManagerCall(Node\Expr\MethodCall|Node\Expr\StaticCall $call): bool
+    {
+        if ($call instanceof Node\Expr\StaticCall) {
+            return $this->isEventManagerClass($call);
+        }
+
+        $getInstance = $call->var;
+
+        return $getInstance instanceof Node\Expr\StaticCall
+            && $getInstance->name instanceof Node\Identifier
+            && $getInstance->name->toLowerString() === 'getinstance'
+            && $this->isEventManagerClass($getInstance);
+    }
+
+    private function isEventManagerClass(Node\Expr\StaticCall $call): bool
+    {
+        return $call->class instanceof Node\Name
+            && strtolower('\\' . ltrim($call->class->toString(), '\\')) === '\\bitrix\\main\\eventmanager';
     }
 
     /**

@@ -1,4 +1,5 @@
 import type { IndexDatabase } from '../db/index.ts';
+import { COMPONENT_GROUPS } from '../db/components.ts';
 import { envelope } from '../envelope.ts';
 import type { ToolDefinition } from '../types.ts';
 
@@ -21,20 +22,17 @@ export function listComponentsTool(db: IndexDatabase): ToolDefinition {
       const where: string[] = [];
       const params: unknown[] = [];
       if (args.module) {
-        where.push('m.code = ?');
+        where.push('module = ?');
         params.push(String(args.module));
       }
       if (args.name_filter) {
-        where.push('LOWER(c.full_name) LIKE ?');
+        where.push('LOWER(full_name) LIKE ?');
         params.push(`%${String(args.name_filter).toLowerCase()}%`);
       }
       const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
       const limit = Math.min(Math.max(Number(args.limit ?? 15), 1), 25);
       const offset = Math.max(Number(args.offset ?? 0), 0);
-      const total = db.count(
-        `SELECT COUNT(*) AS c FROM component c JOIN module m ON m.id = c.module_id ${clause}`,
-        params,
-      );
+      const total = db.count(`SELECT COUNT(*) AS c FROM (${COMPONENT_GROUPS}) grouped ${clause}`, params);
       const components = db.all<{
         full_name: string;
         title: string | null;
@@ -44,13 +42,9 @@ export function listComponentsTool(db: IndexDatabase): ToolDefinition {
         rel_path: string;
         param_count: number;
       }>(
-        `SELECT c.full_name, c.title, c.params_resolved, m.code AS module,
-                m.version AS module_version, f.rel_path,
-                (SELECT COUNT(*) FROM component_param cp WHERE cp.component_id = c.id) AS param_count
-         FROM component c
-         JOIN module m ON m.id = c.module_id
-         JOIN file f ON f.id = c.file_id
-         ${clause} ORDER BY c.full_name LIMIT ? OFFSET ?`,
+        `SELECT full_name, title, params_resolved, module, module_version, rel_path, param_count
+         FROM (${COMPONENT_GROUPS}) grouped ${clause}
+         ORDER BY full_name, module, root_id LIMIT ? OFFSET ?`,
         [...params, limit, offset],
       ).map((c) => ({
         name: c.full_name,

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace BitrixMcp\Indexer\Core;
 
+use BitrixMcp\Indexer\ExitCode;
+use BitrixMcp\Indexer\Preflight\PreflightFailure;
 use PhpParser\Node;
 use PhpParser\NodeFinder;
 use PhpParser\Parser;
@@ -112,7 +114,10 @@ final class ModuleVersionReader
         $entries = @scandir($modulesDir);
 
         if ($entries === false) {
-            return [];
+            throw new PreflightFailure(
+                "ОШИБКА: каталог модулей недоступен для чтения: {$modulesDir}",
+                ExitCode::ConfigError,
+            );
         }
 
         $result = [];

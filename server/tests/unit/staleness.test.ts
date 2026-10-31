@@ -204,4 +204,60 @@ describe('Обнаружение рассинхрона', { skip: !indexAvailabl
       resetStalenessCache();
     }
   });
+
+  test('дополнительный корень проверяется по собственному пути', () => {
+    const core = fakeCore('25.100.300', {});
+    const extra = fakeCore('0.0.0', { custom: '99.0.0' });
+    const idx = indexPointingAt(core, (w) => {
+      w.prepare("UPDATE snapshot SET sm_version = '25.100.300'").run();
+      w.prepare("INSERT INTO index_root (path, label, is_core) VALUES (?, 'extra:project', 0)").run(extra);
+      const rootId = Number(w.prepare("SELECT id FROM index_root WHERE label = 'extra:project'").get().id);
+      w.prepare(`
+        INSERT INTO module (root_id, code, version, version_source, rel_path)
+        VALUES (?, 'custom', '1.0.0', 'module_file', 'modules/custom')
+      `).run(rootId);
+    });
+
+    resetStalenessCache();
+    const db = new IndexDatabase(idx);
+
+    try {
+      const regular = checkStaleness(db);
+      assert.equal(regular.stale, true);
+      assert.match(String(regular.reason), /custom \(extra:project\)/);
+      const custom = checkDeepStaleness(db).drifted.find((item) => item.module === 'custom');
+      assert.equal(custom?.root, 'extra:project');
+      assert.equal(custom?.indexed, '1.0.0');
+      assert.equal(custom?.current, '99.0.0');
+    } finally {
+      db.close();
+      resetStalenessCache();
+    }
+  });
+
+  test('недоступный дополнительный корень выставляет stale', () => {
+    const core = fakeCore('25.100.300', {});
+    const idx = indexPointingAt(core, (w) => {
+      w.prepare("UPDATE snapshot SET sm_version = '25.100.300'").run();
+      w.prepare("INSERT INTO index_root (path, label, is_core) VALUES ('/missing/extra', 'extra:gone', 0)").run();
+      const rootId = Number(w.prepare("SELECT id FROM index_root WHERE label = 'extra:gone'").get().id);
+      w.prepare(`
+        INSERT INTO module (root_id, code, version, version_source, rel_path)
+        VALUES (?, 'custom', '1.0.0', 'module_file', 'modules/custom')
+      `).run(rootId);
+    });
+
+    resetStalenessCache();
+    const db = new IndexDatabase(idx);
+
+    try {
+      const result = checkDeepStaleness(db);
+      assert.equal(result.stale, true);
+      assert.match(String(result.reason), /extra:gone.*недоступен|недоступен.*extra:gone/);
+      assert.equal(result.drifted.find((item) => item.module === 'custom')?.current, null);
+    } finally {
+      db.close();
+      resetStalenessCache();
+    }
+  });
 });

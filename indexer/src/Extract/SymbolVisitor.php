@@ -75,6 +75,7 @@ final class SymbolVisitor extends NodeVisitorAbstract
             methods: $this->methodsOf($node),
             constants: $this->constantsOf($node),
             traits: $this->traitsOf($node),
+            traitAdaptations: $this->traitAdaptationsOf($node),
             orm: $this->orm->extract($node),
         );
 
@@ -143,6 +144,57 @@ final class SymbolVisitor extends NodeVisitorAbstract
         }
 
         return $names;
+    }
+
+    /** @return list<ExtractedTraitAdaptation> */
+    private function traitAdaptationsOf(ClassLike $node): array
+    {
+        $result = [];
+
+        foreach ($node->getTraitUses() as $use) {
+            foreach ($use->adaptations as $adaptation) {
+                $traits = $adaptation->trait === null ? $use->traits : [$adaptation->trait];
+                $methodName = $adaptation->method->toString();
+
+                foreach ($traits as $trait) {
+                    if ($adaptation instanceof Node\Stmt\TraitUseAdaptation\Precedence) {
+                        foreach ($adaptation->insteadof as $excludedTrait) {
+                            $result[] = new ExtractedTraitAdaptation(
+                                '\\' . $excludedTrait->toString(),
+                                $methodName,
+                                null,
+                                null,
+                                true,
+                            );
+                        }
+
+                        continue;
+                    }
+
+                    if ($adaptation instanceof Node\Stmt\TraitUseAdaptation\Alias) {
+                        $result[] = new ExtractedTraitAdaptation(
+                            '\\' . $trait->toString(),
+                            $methodName,
+                            $adaptation->newName?->toString(),
+                            $this->traitVisibility($adaptation->newModifier),
+                            false,
+                        );
+                    }
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    private function traitVisibility(?int $modifier): ?string
+    {
+        return match ($modifier) {
+            Class_::MODIFIER_PUBLIC => 'public',
+            Class_::MODIFIER_PROTECTED => 'protected',
+            Class_::MODIFIER_PRIVATE => 'private',
+            default => null,
+        };
     }
 
     /** @return list<ExtractedMethod> */

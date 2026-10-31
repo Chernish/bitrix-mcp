@@ -91,10 +91,39 @@ final class FluentMapParser
         $defaultRepr = null;
         $defaultResolved = true;
         $values = null;
+        $configuration = $cursor->args[1] ?? null;
 
-        // Цепочка была собрана от конца к началу — порядок для признаков
-        // неважен, каждый вызов независим.
-        foreach ($chain as $call) {
+        if ($configuration instanceof Node\Arg && $configuration->value instanceof Node\Expr\Array_) {
+            foreach ($configuration->value->items as $item) {
+                if (!$item?->key instanceof Node\Scalar\String_) {
+                    continue;
+                }
+
+                switch (strtolower($item->key->value)) {
+                    case 'primary':
+                        $isPrimary = $this->isTrue($item->value);
+                        break;
+                    case 'required':
+                        $isRequired = $this->isTrue($item->value);
+                        break;
+                    case 'autocomplete':
+                        $isAutocomplete = $this->isTrue($item->value);
+                        break;
+                    case 'default_value':
+                        $defaultRepr = $item->value instanceof Node\Expr\Closure
+                                || $item->value instanceof Node\Expr\ArrowFunction
+                            ? null
+                            : $this->renderer->renderExpression($item->value);
+                        $defaultResolved = $defaultRepr !== null;
+                        break;
+                    case 'values':
+                        $values = $this->renderer->renderExpression($item->value);
+                        break;
+                }
+            }
+        }
+
+        foreach (array_reverse($chain) as $call) {
             $method = $call->name instanceof Node\Identifier ? $call->name->toString() : '';
             $firstArg = $call->args[0] ?? null;
             $argValue = $firstArg instanceof Node\Arg ? $firstArg->value : null;
@@ -114,9 +143,11 @@ final class FluentMapParser
 
                 case 'configureDefaultValue':
                     if ($argValue instanceof Node\Expr\Closure || $argValue instanceof Node\Expr\ArrowFunction) {
+                        $defaultRepr = null;
                         $defaultResolved = false;
                     } elseif ($argValue !== null) {
                         $defaultRepr = $this->renderer->renderExpression($argValue);
+                        $defaultResolved = true;
                     }
                     break;
 

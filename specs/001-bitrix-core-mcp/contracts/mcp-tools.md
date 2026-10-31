@@ -85,6 +85,8 @@
 
 **Выход**: `{ module, module_version, events: [{ name, kind, call_style, file, line, params }], total, truncated }`.
 
+`kind=send` отбирает события по `owner_module`; `kind=register` — по модулю файла подписки (`event.module_id`). Поэтому подписка `testmod` на событие `main` возвращается у `testmod` с его версией. `kind=any` учитывает обе роли.
+
 ---
 
 ## 5. `bitrix_get_component`
@@ -123,7 +125,7 @@
 
 ## 8. `bitrix_search_docs`
 
-**Вход**: `query` (обязательно, поддержка кириллицы обязательна — FR-032), `section`, `limit` (по умолчанию 5).
+**Вход**: `query` (обязательно, поддержка кириллицы обязательна — FR-032), `section`, `limit` (по умолчанию 5), необязательный `check_symbol` (класс, метод либо `Class::method`).
 
 **Выход**: массив `{ title, section, url, excerpt, version_notes[], source_ref, score }`
 плюс `docs_crawled_at`, `docs_source` и `docs_source_revision`.
@@ -143,14 +145,14 @@
 
 Диагностика. Не заменяет флаг `stale` в остальных ответах, а дополняет его подробностями.
 
-**Вход**: `deep` (по умолчанию `false` — сверка только версии сборки; `true` — перечитывание карты версий всех модулей).
+**Вход**: `deep` (по умолчанию `false`; `true` добавляет подробную карту версий всех модулей). И обычная, и deep-проверка сравнивают сборку и версии модулей в собственных корнях; дополнительный корень проверяется по его пути.
 
 **Выход**:
 
 ```jsonc
 {
   "core_root": "...", "sm_version": "25.100.300", "sm_version_date": "2025-03-21",
-  "indexed_at": "...", "schema_version": 1,
+  "indexed_at": "...", "schema_version": 12,
   "short_open_tag_enabled": true,
   "counts": { "modules": 99, "files": 67836, "symbols": 0, "methods": 0,
               "orm_entities": 0, "events": 0, "components": 0, "doc_pages": 112 },

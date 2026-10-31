@@ -43,51 +43,56 @@ export function findCallableTool(db: IndexDatabase): ToolDefinition {
       const module = args.module ? String(args.module) : null;
       const limit = Math.min(Math.max(Number(args.limit ?? 12), 1), 20);
       const offset = Math.max(Number(args.offset ?? 0), 0);
-      const fetch = offset + limit;
-      const rows: CallableRow[] = [];
+      const selects: string[] = [];
+      const params: unknown[] = [];
       let total = 0;
 
       if (kind !== 'function') {
         const where = [`me.name_lower ${operator} ?`];
-        const params: unknown[] = [match];
+        const sourceParams: unknown[] = [match];
         if (module) {
           where.push('mo.code = ?');
-          params.push(module);
+          sourceParams.push(module);
         }
         const from = `FROM method me JOIN symbol s ON s.id = me.symbol_id
                       JOIN module mo ON mo.id = s.module_id JOIN file f ON f.id = s.file_id
                       WHERE ${where.join(' AND ')}`;
-        total += db.count(`SELECT COUNT(*) AS c ${from}`, params);
-        rows.push(...db.all<CallableRow>(
+        total += db.count(`SELECT COUNT(*) AS c ${from}`, sourceParams);
+        selects.push(
           `SELECT 'method' AS kind, me.name, s.fqn || '::' || me.name AS fqn,
                   s.fqn AS class_fqn, me.signature, mo.code AS module,
-                  mo.version AS module_version, f.rel_path, me.line, me.is_deprecated
-           ${from} ORDER BY s.fqn, me.name LIMIT ?`,
-          [...params, fetch],
-        ));
+                  mo.version AS module_version, f.rel_path, me.line, me.is_deprecated,
+                  me.id AS source_id
+           ${from}`,
+        );
+        params.push(...sourceParams);
       }
 
       if (kind === 'function' || kind === 'any') {
         const where = [`gf.short_name_lower ${operator} ?`];
-        const params: unknown[] = [match];
+        const sourceParams: unknown[] = [match];
         if (module) {
           where.push('mo.code = ?');
-          params.push(module);
+          sourceParams.push(module);
         }
         const from = `FROM global_function gf JOIN module mo ON mo.id = gf.module_id
                       JOIN file f ON f.id = gf.file_id WHERE ${where.join(' AND ')}`;
-        total += db.count(`SELECT COUNT(*) AS c ${from}`, params);
-        rows.push(...db.all<CallableRow>(
+        total += db.count(`SELECT COUNT(*) AS c ${from}`, sourceParams);
+        selects.push(
           `SELECT 'function' AS kind, gf.short_name AS name, gf.fqn, NULL AS class_fqn,
                   gf.signature, mo.code AS module, mo.version AS module_version,
-                  f.rel_path, gf.line, gf.is_deprecated
-           ${from} ORDER BY gf.fqn LIMIT ?`,
-          [...params, fetch],
-        ));
+                  f.rel_path, gf.line, gf.is_deprecated, gf.id AS source_id
+           ${from}`,
+        );
+        params.push(...sourceParams);
       }
 
-      rows.sort((a, b) => a.fqn.localeCompare(b.fqn));
-      const items = rows.slice(offset, offset + limit).map((row) => ({
+      const rows = db.all<CallableRow>(
+        `SELECT * FROM (${selects.join(' UNION ALL ')})
+         ORDER BY fqn, kind, module, rel_path, line, source_id LIMIT ? OFFSET ?`,
+        [...params, limit, offset],
+      );
+      const items = rows.map((row) => ({
         kind: row.kind,
         name: row.name,
         fqn: row.fqn,

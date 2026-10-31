@@ -77,6 +77,68 @@ final class NameResolutionTest extends TestCase
         );
     }
 
+    public function testTraitAdaptationsKeepTraitAliasPrecedenceAndVisibility(): void
+    {
+        [$extraction] = $this->extractor->extract(<<<'PHP'
+        <?php
+        namespace App\Domain;
+
+        use Vendor\Lib\Concerns\LogsActivity as Logs;
+        use Vendor\Lib\Concerns\TracksChanges;
+
+        class Widget
+        {
+            use Logs, TracksChanges {
+                Logs::log insteadof TracksChanges;
+                Logs::log as protected auditLog;
+            }
+        }
+        PHP);
+
+        self::assertNotNull($extraction);
+        $adaptations = $extraction->symbols[0]->traitAdaptations;
+        self::assertCount(2, $adaptations);
+        self::assertSame('\Vendor\Lib\Concerns\TracksChanges', $adaptations[0]->traitFqn);
+        self::assertSame('log', $adaptations[0]->methodName);
+        self::assertTrue($adaptations[0]->excluded);
+        self::assertSame('\Vendor\Lib\Concerns\LogsActivity', $adaptations[1]->traitFqn);
+        self::assertSame('auditLog', $adaptations[1]->alias);
+        self::assertSame('protected', $adaptations[1]->visibility);
+    }
+
+    public function testAdaptationWithoutTraitNameAppliesToWholeGroup(): void
+    {
+        [$extraction, $error] = $this->extractor->extract(<<<'PHP'
+        <?php
+        namespace App\Domain;
+
+        use Vendor\Lib\Concerns\First;
+        use Vendor\Lib\Concerns\Other;
+
+        class Widget
+        {
+            use First, Other {
+                run as aliasRun;
+                run as protected;
+            }
+        }
+        PHP);
+
+        self::assertNull($error);
+        self::assertNotNull($extraction);
+        $adaptations = $extraction->symbols[0]->traitAdaptations;
+        self::assertCount(4, $adaptations);
+        self::assertSame(['aliasRun', 'aliasRun', null, null], array_map(
+            static fn($adaptation) => $adaptation->alias,
+            $adaptations,
+        ));
+        self::assertSame([null, null, 'protected', 'protected'], array_map(
+            static fn($adaptation) => $adaptation->visibility,
+            $adaptations,
+        ));
+        self::assertSame('\Vendor\Lib\Concerns\Other', $adaptations[1]->traitFqn);
+    }
+
     public function testResolvesRelativeNamesAgainstCurrentNamespace(): void
     {
         $code = <<<'PHP'

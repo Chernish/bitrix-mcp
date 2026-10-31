@@ -106,6 +106,7 @@ final class UpdateCommand
         $unchanged = 0;
         $changed = 0;
         $added = 0;
+        $readErrors = 0;
         $fileCount = 0;
         $totalBytes = 0;
 
@@ -135,7 +136,14 @@ final class UpdateCommand
             $code = $file->readContents();
 
             if ($code === null) {
+                $readErrors++;
                 $errors->record($file->relPath, 'файл недоступен для чтения');
+
+                if ($known !== null) {
+                    $stmt = $pdo->prepare('UPDATE file SET seen_in_pass = 1 WHERE id = ?');
+                    $stmt->execute([$known['id']]);
+                }
+
                 continue;
             }
 
@@ -196,6 +204,19 @@ final class UpdateCommand
 
         if ($storedErrors > 0) {
             $out->line(sprintf('Ошибок разбора: %d (%.3f%%)', $storedErrors, $errorShare * 100));
+        }
+
+        foreach ($errors->sample() as $error) {
+            $out->line(sprintf('  - %s: %s', $error['path'], $error['message']));
+        }
+
+        if ($readErrors > 0) {
+            $out->line(sprintf(
+                'ОШИБКА: не прочитано файлов: %d. Прежние данные сохранены, обновление не опубликовано.',
+                $readErrors,
+            ));
+
+            return ExitCode::ParseErrorThreshold;
         }
 
         if ($errorShare > self::PARSE_ERROR_THRESHOLD) {

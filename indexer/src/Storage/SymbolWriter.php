@@ -27,6 +27,7 @@ final class SymbolWriter
     private ?PDOStatement $insertSymbol = null;
     private ?PDOStatement $insertInterface = null;
     private ?PDOStatement $insertTrait = null;
+    private ?PDOStatement $insertTraitAdaptation = null;
     private ?PDOStatement $insertMethod = null;
     private ?PDOStatement $insertParameter = null;
     private ?PDOStatement $insertAlias = null;
@@ -254,6 +255,29 @@ final class SymbolWriter
                 ':sid' => $symbolId,
                 ':fqn' => $trait,
                 ':fqn_lower' => mb_strtolower($trait),
+            ]);
+        }
+
+        $this->insertTraitAdaptation ??= $this->pdo->prepare(
+            'INSERT INTO symbol_trait_adaptation
+                (symbol_id, trait_fqn, trait_fqn_lower, method_name, method_name_lower,
+                 alias, alias_lower, visibility, is_excluded)
+             VALUES
+                (:sid, :fqn, :fqn_lower, :method, :method_lower,
+                 :alias, :alias_lower, :visibility, :excluded)'
+        );
+
+        foreach ($symbol->traitAdaptations as $adaptation) {
+            $this->insertTraitAdaptation->execute([
+                ':sid' => $symbolId,
+                ':fqn' => $adaptation->traitFqn,
+                ':fqn_lower' => mb_strtolower($adaptation->traitFqn),
+                ':method' => $adaptation->methodName,
+                ':method_lower' => mb_strtolower($adaptation->methodName),
+                ':alias' => $adaptation->alias,
+                ':alias_lower' => $adaptation->alias === null ? null : mb_strtolower($adaptation->alias),
+                ':visibility' => $adaptation->visibility,
+                ':excluded' => $adaptation->excluded ? 1 : 0,
             ]);
         }
 

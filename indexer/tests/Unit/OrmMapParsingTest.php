@@ -173,6 +173,82 @@ final class OrmMapParsingTest extends TestCase
         self::assertSame('string', $fields['COLOR']->dataType);
     }
 
+    public function testFluentConstructorConfigurationAndLastDefaultWin(): void
+    {
+        $orm = $this->ormOf(<<<'PHP'
+        <?php
+        use Bitrix\Main\ORM\Fields\IntegerField;
+
+        class ConfiguredTable
+        {
+            public static function getMap(): array
+            {
+                return [
+                    (new IntegerField('ID', [
+                        'primary' => true,
+                        'required' => true,
+                        'autocomplete' => true,
+                        'default_value' => 1,
+                    ]))
+                        ->configureDefaultValue(2)
+                        ->configureDefaultValue(3),
+                ];
+            }
+        }
+        PHP);
+
+        $field = $this->byName($orm)['ID'];
+        self::assertTrue($field->isPrimary);
+        self::assertTrue($field->isRequired);
+        self::assertTrue($field->isAutocomplete);
+        self::assertSame('3', $field->defaultRepr);
+        self::assertTrue($field->isDefaultResolved);
+        self::assertTrue($orm->isComplete);
+    }
+
+    public function testNestedClosureReturnDoesNotReplaceMapReturn(): void
+    {
+        $orm = $this->ormOf(<<<'PHP'
+        <?php
+        class ClosureMapTable
+        {
+            public static function getMap(): array
+            {
+                $factory = function () {
+                    return ['WRONG' => ['data_type' => 'string']];
+                };
+
+                return ['ID' => ['data_type' => 'integer', 'primary' => true]];
+            }
+        }
+        PHP);
+
+        self::assertSame(['ID'], array_map(static fn($field) => $field->name, $orm->fields));
+        self::assertTrue($orm->isComplete);
+    }
+
+    public function testAlternativeMapReturnsAreMarkedUnresolved(): void
+    {
+        $orm = $this->ormOf(<<<'PHP'
+        <?php
+        class AlternativeMapTable
+        {
+            public static function getMap(): array
+            {
+                if (self::useLegacy()) {
+                    return ['LEGACY' => ['data_type' => 'string']];
+                }
+
+                return ['ID' => ['data_type' => 'integer']];
+            }
+        }
+        PHP);
+
+        self::assertSame([], $orm->fields);
+        self::assertSame('unresolved', $orm->extractionStyle);
+        self::assertFalse($orm->isComplete);
+    }
+
     public function testFluentReferenceExtractsTargetAndJoin(): void
     {
         $orm = $this->ormOf(<<<'PHP'

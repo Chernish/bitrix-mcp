@@ -61,7 +61,12 @@ final class FunctionVisitor extends NodeVisitorAbstract
         $this->functions[] = new ExtractedFunction(
             fqn: '\\' . ltrim($resolved, '\\'),
             shortName: $name,
-            signature: $this->renderer->renderFunction($name, $params, $returnType),
+            signature: $this->renderer->renderFunction(
+                $name,
+                $params,
+                $returnType,
+                $node->returnsByRef(),
+            ),
             returnType: $returnType,
             docComment: $doc,
             isDeprecated: $deprecated,

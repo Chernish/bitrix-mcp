@@ -37,52 +37,56 @@ export function findNamespaceTool(db: IndexDatabase): ToolDefinition {
       const kind = String(args.kind ?? 'any');
       const limit = Math.min(Math.max(Number(args.limit ?? 15), 1), 25);
       const offset = Math.max(Number(args.offset ?? 0), 0);
-      const fetch = offset + limit;
-      const rows: NamespaceRow[] = [];
+      const selects: string[] = [];
+      const params: unknown[] = [];
       let total = 0;
 
       if (kind !== 'function') {
         const where = ['s.fqn_lower LIKE ? ESCAPE \'!\''];
-        const params: unknown[] = [prefix];
+        const sourceParams: unknown[] = [prefix];
         if (kind !== 'any') {
           where.push('s.kind = ?');
-          params.push(kind);
+          sourceParams.push(kind);
         }
         if (module) {
           where.push('m.code = ?');
-          params.push(module);
+          sourceParams.push(module);
         }
         const from = `FROM symbol s JOIN module m ON m.id = s.module_id
                       JOIN file f ON f.id = s.file_id WHERE ${where.join(' AND ')}`;
-        total += db.count(`SELECT COUNT(*) AS c ${from}`, params);
-        rows.push(...db.all<NamespaceRow>(
+        total += db.count(`SELECT COUNT(*) AS c ${from}`, sourceParams);
+        selects.push(
           `SELECT s.kind, s.fqn, NULL AS signature, m.code AS module,
-                  m.version AS module_version, f.rel_path, s.line
-           ${from} ORDER BY s.fqn LIMIT ?`,
-          [...params, fetch],
-        ));
+                  m.version AS module_version, f.rel_path, s.line, s.id AS source_id
+           ${from}`,
+        );
+        params.push(...sourceParams);
       }
 
       if (kind === 'function' || kind === 'any') {
         const where = ['gf.fqn_lower LIKE ?'];
-        const params: unknown[] = [prefix];
+        const sourceParams: unknown[] = [prefix];
         if (module) {
           where.push('m.code = ?');
-          params.push(module);
+          sourceParams.push(module);
         }
         const from = `FROM global_function gf JOIN module m ON m.id = gf.module_id
                       JOIN file f ON f.id = gf.file_id WHERE ${where.join(' AND ')}`;
-        total += db.count(`SELECT COUNT(*) AS c ${from}`, params);
-        rows.push(...db.all<NamespaceRow>(
+        total += db.count(`SELECT COUNT(*) AS c ${from}`, sourceParams);
+        selects.push(
           `SELECT 'function' AS kind, gf.fqn, gf.signature, m.code AS module,
-                  m.version AS module_version, f.rel_path, gf.line
-           ${from} ORDER BY gf.fqn LIMIT ?`,
-          [...params, fetch],
-        ));
+                  m.version AS module_version, f.rel_path, gf.line, gf.id AS source_id
+           ${from}`,
+        );
+        params.push(...sourceParams);
       }
 
-      rows.sort((a, b) => a.fqn.localeCompare(b.fqn));
-      const items = rows.slice(offset, offset + limit).map((row) => ({
+      const rows = db.all<NamespaceRow>(
+        `SELECT * FROM (${selects.join(' UNION ALL ')})
+         ORDER BY fqn, kind, module, rel_path, line, source_id LIMIT ? OFFSET ?`,
+        [...params, limit, offset],
+      );
+      const items = rows.map((row) => ({
         kind: row.kind,
         fqn: row.fqn,
         ...(row.signature ? { signature: row.signature } : {}),

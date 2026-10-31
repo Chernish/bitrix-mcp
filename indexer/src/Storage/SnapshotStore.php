@@ -32,6 +32,7 @@ final class SnapshotStore
     private readonly string $directory;
     private readonly string $catalogPath;
     private readonly string $activePath;
+    private bool $operationLocked = false;
 
     public function __construct(private readonly string $indexPath)
     {
@@ -59,56 +60,64 @@ final class SnapshotStore
     /** @return Metadata */
     public function publish(string $staging): array
     {
-        $metadata = $this->archive($staging);
-        $this->promote($metadata);
-        $this->writeActive($metadata);
+        return $this->withOperationLock(function () use ($staging): array {
+            $metadata = $this->archive($staging);
+            $this->promote($metadata);
+            $this->writeActive($metadata);
 
-        return $metadata;
+            return $metadata;
+        });
     }
 
     /** @return Metadata */
     public function archiveCurrent(): array
     {
-        $activeId = $this->activeId();
-        if ($activeId !== null) {
-            return $this->metadata($activeId);
-        }
+        return $this->withOperationLock(function (): array {
+            $activeId = $this->activeId();
+            if ($activeId !== null) {
+                return $this->metadata($activeId);
+            }
 
-        return $this->publish($this->stage());
+            return $this->publish($this->stage());
+        });
     }
 
     /** @return Metadata */
     public function activate(string $id): array
     {
-        $metadata = $this->metadata($id);
-        $this->promote($metadata);
-        $this->writeActive($metadata);
+        return $this->withOperationLock(function () use ($id): array {
+            $metadata = $this->metadata($id);
+            $this->promote($metadata);
+            $this->writeActive($metadata);
 
-        return $metadata;
+            return $metadata;
+        });
     }
 
     public function delete(string $id): void
     {
-        $this->withCatalogLock(function () use ($id): void {
-            $metadata = $this->metadata($id);
-            if ($this->activeId() === $id) {
-                throw new PreflightFailure(
-                    "ОШИБКА: нельзя удалить активный снимок {$id}. Сначала активируйте другой.",
-                    ExitCode::ConfigError,
-                );
-            }
+        $this->withOperationLock(function () use ($id): void {
+            $this->withCatalogLock(function () use ($id): void {
+                $metadata = $this->metadata($id);
+                if ($this->activeId() === $id) {
+                    throw new PreflightFailure(
+                        "ОШИБКА: нельзя удалить активный снимок {$id}. Сначала активируйте другой.",
+                        ExitCode::ConfigError,
+                    );
+                }
 
-            $catalog = $this->readCatalog();
-            $catalog['snapshots'] = array_values(array_filter(
-                $catalog['snapshots'],
-                static fn(array $item): bool => $item['id'] !== $id,
-            ));
-            $this->writeCatalog($catalog);
+                $catalog = $this->readCatalog();
+                $catalog['snapshots'] = array_values(array_filter(
+                    $catalog['snapshots'],
+                    static fn(array $item): bool => $item['id'] !== $id,
+                ));
+                $this->writeCatalog($catalog);
 
-            $path = $this->path($metadata);
-            if (is_file($path) && !unlink($path)) {
-                throw new RuntimeException("не удалось удалить снимок {$path}");
-            }
+                $path = $this->path($metadata);
+                if (is_file($path) && !unlink($path)) {
+                    throw new RuntimeException("не удалось удалить снимок {$path}");
+                }
+            });
         });
     }
 
@@ -416,6 +425,38 @@ final class SnapshotStore
         );
         if (file_put_contents($temporary, $json . PHP_EOL) === false || !rename($temporary, $this->catalogPath)) {
             throw new RuntimeException("не удалось записать каталог снимков: {$this->catalogPath}");
+        }
+    }
+
+    /**
+     * @template T
+     * @param callable(): T $operation
+     * @return T
+     */
+    public function withOperationLock(callable $operation): mixed
+    {
+        if ($this->operationLocked) {
+            return $operation();
+        }
+
+        $this->ensureDirectory();
+        $lock = fopen($this->indexPath . '.lock', 'c');
+        if ($lock === false) {
+            throw new RuntimeException("не удалось открыть блокировку индекса: {$this->indexPath}");
+        }
+
+        try {
+            if (!flock($lock, LOCK_EX)) {
+                throw new RuntimeException("не удалось заблокировать индекс: {$this->indexPath}");
+            }
+
+            $this->operationLocked = true;
+
+            return $operation();
+        } finally {
+            $this->operationLocked = false;
+            flock($lock, LOCK_UN);
+            fclose($lock);
         }
     }
 

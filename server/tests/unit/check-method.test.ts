@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 
 import { IndexDatabase, SUPPORTED_SCHEMA_VERSION } from '../../src/db/index.ts';
 import { checkMethodTool } from '../../src/tools/check-method.ts';
+import { documentedSymbolPresent } from '../../src/tools/search-docs.ts';
 import type { Envelope } from '../../src/types.ts';
 
 interface CheckResult {
@@ -14,6 +15,8 @@ interface CheckResult {
   class_exists: boolean;
   declared_in?: string | null;
   file?: string;
+  signature?: string | null;
+  visibility?: string | null;
   did_you_mean?: { guess: boolean; names: string[] };
 }
 
@@ -53,6 +56,11 @@ describe('Точная проверка методов', () => {
         alias_fqn_lower TEXT, alias_short_lower TEXT, target_fqn TEXT, line INTEGER
       );
       CREATE TABLE symbol_trait (symbol_id INTEGER, trait_fqn TEXT, trait_fqn_lower TEXT);
+      CREATE TABLE symbol_trait_adaptation (
+        id INTEGER PRIMARY KEY, symbol_id INTEGER, trait_fqn TEXT, trait_fqn_lower TEXT,
+        method_name TEXT, method_name_lower TEXT, alias TEXT, alias_lower TEXT,
+        visibility TEXT, is_excluded INTEGER
+      );
       CREATE TABLE method (
         id INTEGER PRIMARY KEY, symbol_id INTEGER, name TEXT, name_lower TEXT, visibility TEXT,
         is_static INTEGER, is_abstract INTEGER, is_final INTEGER, return_type TEXT,
@@ -107,6 +115,12 @@ describe('Точная проверка методов', () => {
 
     addSymbol('\\Fixture\\ProductTable', 'class', ['save']);
     addSymbol('\\Fixture\\Base', 'class', ['save', 'parentOnly']);
+    addSymbol('\\Fixture\\AliasChild', 'class', [], '\\Fixture\\BaseAlias');
+    writable.prepare(`
+      INSERT INTO symbol_alias (id, module_id, file_id, alias_fqn, alias_fqn_lower,
+                                alias_short_lower, target_fqn, line)
+      VALUES (1, 1, 1, '\\Fixture\\BaseAlias', '\\fixture\\basealias', 'basealias', '\\Fixture\\Base', 10)
+    `).run();
     addSymbol('\\Fixture\\Child', 'class', ['save'], '\\Fixture\\Base');
     addSymbol('\\Fixture\\Grandchild', 'class', [], '\\Fixture\\Child');
     addSymbol('\\Fixture\\NestedTrait', 'trait', ['fromTrait']);
@@ -114,6 +128,34 @@ describe('Точная проверка методов', () => {
     addSymbol('\\Fixture\\TraitConsumer', 'class', [], '\\Fixture\\Base', ['\\Fixture\\OuterTrait']);
     addSymbol('\\Fixture\\CycleA', 'class', [], '\\Fixture\\CycleB');
     addSymbol('\\Fixture\\CycleB', 'class', [], '\\Fixture\\CycleA');
+    addSymbol('\\Fixture\\ConflictA', 'trait', ['choose']);
+    addSymbol('\\Fixture\\ConflictB', 'trait', ['choose']);
+    const adapted = addSymbol(
+      '\\Fixture\\AdaptedConsumer',
+      'class',
+      [],
+      null,
+      ['\\Fixture\\ConflictA', '\\Fixture\\ConflictB'],
+    );
+    const addAdaptation = writable.prepare(`
+      INSERT INTO symbol_trait_adaptation (
+        symbol_id, trait_fqn, trait_fqn_lower, method_name, method_name_lower,
+        alias, alias_lower, visibility, is_excluded
+      ) VALUES (?, ?, ?, 'choose', 'choose', ?, ?, ?, ?)
+    `);
+    addAdaptation.run(adapted, '\\Fixture\\ConflictB', '\\fixture\\conflictb', null, null, null, 1);
+    for (const trait of ['\\Fixture\\ConflictA', '\\Fixture\\ConflictB']) {
+      addAdaptation.run(adapted, trait, trait.toLowerCase(), 'chooseAll', 'chooseall', null, 0);
+    }
+    addAdaptation.run(
+      adapted,
+      '\\Fixture\\ConflictA',
+      '\\fixture\\conflicta',
+      'chooseA',
+      'choosea',
+      'protected',
+      0,
+    );
     writable.close();
     db = new IndexDatabase(path);
   });
@@ -158,5 +200,38 @@ describe('Точная проверка методов', () => {
     const response = call('CycleA', 'missing');
     assert.equal(response.result.class_exists, true);
     assert.equal(response.result.exists, false);
+  });
+
+  test('insteadof выбирает метод указанного трейта', () => {
+    const response = call('AdaptedConsumer', 'choose');
+    assert.equal(response.result.exists, true);
+    assert.equal(response.result.declared_in, '\\Fixture\\ConflictA');
+  });
+
+  test('as создаёт псевдоним с адаптированной сигнатурой и видимостью', () => {
+    const response = call('AdaptedConsumer', 'chooseA');
+    assert.equal(response.result.exists, true);
+    assert.equal(response.result.declared_in, '\\Fixture\\ConflictA');
+    assert.equal(response.result.signature, 'protected function chooseA(): void');
+    assert.equal(response.result.visibility, 'protected');
+  });
+
+  test('адаптация без явного трейта доступна в группе', () => {
+    const response = call('AdaptedConsumer', 'chooseAll');
+    assert.equal(response.result.exists, true);
+    assert.equal(response.result.declared_in, '\\Fixture\\ConflictA');
+    assert.equal(response.result.signature, 'public function chooseAll(): void');
+  });
+
+  test('родитель разрешается через class_alias', () => {
+    const response = call('AliasChild', 'parentOnly');
+    assert.equal(response.result.exists, true);
+    assert.equal(response.result.declared_in, '\\Fixture\\Base');
+  });
+
+  test('Class::method в документации проверяется в указанном классе', () => {
+    assert.equal(documentedSymbolPresent(db, 'AdaptedConsumer::chooseA'), true);
+    assert.equal(documentedSymbolPresent(db, 'MissingClass::choose'), false);
+    assert.equal(documentedSymbolPresent(db, 'AdaptedConsumer::notDeclared'), false);
   });
 });

@@ -8,6 +8,7 @@ use BitrixMcp\Indexer\Command\BuildCommand;
 use BitrixMcp\Indexer\Command\Reporter;
 use BitrixMcp\Indexer\Command\UpdateCommand;
 use BitrixMcp\Indexer\ExitCode;
+use BitrixMcp\Indexer\Preflight\PreflightFailure;
 use PDO;
 use PHPUnit\Framework\TestCase;
 
@@ -52,6 +53,31 @@ final class IncrementalUpdateTest extends TestCase
         self::assertSame($before, $this->counts(), 'Обновление без изменений изменило содержимое индекса');
     }
 
+    public function testUnreadableModulesDirectoryKeepsAllIndexedRecords(): void
+    {
+        $before = $this->counts();
+        $path = $this->coreDir . '/modules';
+        self::assertTrue(chmod($path, 0o000));
+
+        try {
+            if (is_readable($path)) {
+                self::markTestSkipped('Проверку отказа чтения нужно запускать без прав root');
+            }
+
+            try {
+                $this->update();
+                self::fail('Нечитаемый каталог модулей не прервал update');
+            } catch (PreflightFailure $error) {
+                self::assertSame(ExitCode::ConfigError, $error->exitCode);
+                self::assertStringContainsString($path, $error->getMessage());
+            }
+
+            self::assertSame($before, $this->counts());
+        } finally {
+            chmod($path, 0o755);
+        }
+    }
+
     public function testChangedFileIsReindexed(): void
     {
         self::assertNotNull($this->findSymbol('CTestModLegacy'));
@@ -72,6 +98,38 @@ final class IncrementalUpdateTest extends TestCase
             $this->findSymbol('CTestModLegacy'),
             'Прежний класс того же файла пропал при перестройке',
         );
+    }
+
+    public function testUnreadableChangedFileRejectsUpdateAndKeepsPreviousApi(): void
+    {
+        $path = $this->coreDir . '/modules/testmod/classes/general/legacy.php';
+        $code = (string)file_get_contents($path);
+        file_put_contents($path, $code . "\nclass CUnreadableNewClass {}\n");
+        self::assertTrue(chmod($path, 0o000));
+
+        try {
+            if (is_readable($path)) {
+                self::markTestSkipped('Проверку отказа чтения нужно запускать без прав root');
+            }
+
+            $stream = $this->sink();
+            $result = (new UpdateCommand())->run(
+                ['core' => $this->coreDir, 'index' => $this->indexPath],
+                new Reporter($stream),
+            );
+            rewind($stream);
+            $output = stream_get_contents($stream);
+
+            self::assertSame(ExitCode::ParseErrorThreshold, $result);
+            self::assertStringContainsString('файл недоступен для чтения', (string)$output);
+            self::assertNotNull($this->findSymbol('CTestModLegacy'));
+            self::assertNull($this->findSymbol('CUnreadableNewClass'));
+        } finally {
+            chmod($path, 0o644);
+        }
+
+        self::assertSame(ExitCode::Success, $this->update());
+        self::assertNotNull($this->findSymbol('CUnreadableNewClass'));
     }
 
     public function testCodeSearchIndexFollowsChangedFiles(): void

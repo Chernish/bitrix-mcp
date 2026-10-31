@@ -65,8 +65,8 @@ export function resetStalenessCache(): void {
 }
 
 export interface DeepStalenessResult extends StalenessResult {
-  /** Модули, у которых версия в ядре разошлась с записанной в индексе. */
-  drifted: Array<{ module: string; indexed: string | null; current: string | null }>;
+  /** Модули, у которых версия в собственном корне разошлась с индексом. */
+  drifted: Array<{ module: string; root: string; indexed: string | null; current: string | null }>;
   checked: number;
 }
 
@@ -117,29 +117,50 @@ function compute(db: IndexDatabase): DeepStalenessResult {
 
   const currentSm = readCurrentSmVersion(coreRoot);
   const indexedSm = db.snapshot.sm_version;
-  const modules = db.all<{ code: string; version: string | null; rel_path: string }>(
-    'SELECT code, version, rel_path FROM module ORDER BY code',
+  const modules = db.all<{
+    code: string;
+    version: string | null;
+    rel_path: string;
+    root_path: string | null;
+    root_label: string;
+    is_core: number;
+  }>(
+    `SELECT m.code, m.version, m.rel_path, r.path AS root_path,
+            r.label AS root_label, r.is_core
+     FROM module m JOIN index_root r ON r.id = m.root_id ORDER BY m.code`,
   );
   const drifted: DeepStalenessResult['drifted'] = [];
   const reasons: string[] = [];
+  const missingRoots = new Set<string>();
 
   if (currentSm !== null && indexedSm !== null && currentSm !== indexedSm) {
     reasons.push(`sm_version изменился: ${indexedSm} -> ${currentSm}`);
   }
 
   for (const row of modules) {
-    const current =
-      row.code === 'main'
-        ? currentSm
-        : readModuleVersion(join(coreRoot, row.rel_path, 'install', 'version.php'));
+    const rootPath = row.is_core === 1 ? coreRoot : row.root_path;
+    if (rootPath === null || !existsSync(rootPath)) {
+      if (!missingRoots.has(row.root_label)) {
+        missingRoots.add(row.root_label);
+        reasons.push(`корень ${row.root_label} недоступен: ${rootPath ?? 'путь не задан'}`);
+      }
+      drifted.push({ module: row.code, root: row.root_label, indexed: row.version, current: null });
+      continue;
+    }
+
+    const current = row.is_core === 1 && row.code === 'main'
+      ? currentSm
+      : readModuleVersion(join(rootPath, row.rel_path, 'install', 'version.php'));
 
     if (current !== row.version) {
-      drifted.push({ module: row.code, indexed: row.version, current });
+      drifted.push({ module: row.code, root: row.root_label, indexed: row.version, current });
     }
   }
 
   if (drifted.length > 0) {
-    const names = drifted.slice(0, 5).map((d) => d.module).join(', ');
+    const names = drifted.slice(0, 5).map(
+      (d) => d.root === 'core' ? d.module : `${d.module} (${d.root})`,
+    ).join(', ');
     const suffix = drifted.length > 5 ? ` и ещё ${drifted.length - 5}` : '';
     reasons.push(`версии модулей разошлись: ${names}${suffix}`);
   }

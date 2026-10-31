@@ -50,7 +50,7 @@ describe('Версионные снимки индекса', () => {
         docs_source_revision TEXT
       );
       CREATE TABLE index_root (id INTEGER PRIMARY KEY, path TEXT, label TEXT, is_core INTEGER);
-      CREATE TABLE module (code TEXT, version TEXT, rel_path TEXT);
+      CREATE TABLE module (root_id INTEGER, code TEXT, version TEXT, rel_path TEXT);
     `);
     db.prepare(`
       INSERT INTO snapshot VALUES (

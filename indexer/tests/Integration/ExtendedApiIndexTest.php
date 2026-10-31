@@ -35,4 +35,23 @@ final class ExtendedApiIndexTest extends IndexBuildTestCase
         self::assertSame('findAll', $usage[0]['context_member']);
         self::assertSame('testmod', $usage[0]['module']);
     }
+
+    public function testTraitAdaptationsArePersisted(): void
+    {
+        $rows = $this->query(
+            'SELECT a.method_name, a.alias, a.visibility, t.trait_fqn
+             FROM symbol_trait_adaptation a
+             JOIN symbol s ON s.id = a.symbol_id
+             JOIN symbol_trait t ON t.symbol_id = s.id AND t.trait_fqn_lower = a.trait_fqn_lower
+             WHERE s.short_name = ?',
+            ['Thing'],
+        );
+
+        self::assertSame([[
+            'method_name' => 'logActivity',
+            'alias' => 'auditLog',
+            'visibility' => 'protected',
+            'trait_fqn' => '\Test\Mod\Concerns\LogsActivity',
+        ]], $rows);
+    }
 }

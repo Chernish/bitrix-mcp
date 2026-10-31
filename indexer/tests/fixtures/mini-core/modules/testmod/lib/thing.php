@@ -16,7 +16,9 @@ use Test\Mod\Contracts\Speaks;
  */
 class Thing extends BaseEntity implements Speaks
 {
-    use LogsActivity;
+    use LogsActivity {
+        logActivity as protected auditLog;
+    }
 
     public const STATUS_ACTIVE = 'A';
 

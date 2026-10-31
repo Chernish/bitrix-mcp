@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace BitrixMcp\Indexer\Core;
 
+use BitrixMcp\Indexer\ExitCode;
+use BitrixMcp\Indexer\Preflight\PreflightFailure;
 use FilesystemIterator;
 use Generator;
 use RecursiveDirectoryIterator;
@@ -89,7 +91,10 @@ final class FileWalker
         $entries = @scandir($modulesDir);
 
         if ($entries === false) {
-            return [];
+            throw new PreflightFailure(
+                "ОШИБКА: каталог модулей недоступен для чтения: {$modulesDir}",
+                ExitCode::ConfigError,
+            );
         }
 
         $codes = [];

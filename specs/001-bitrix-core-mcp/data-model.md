@@ -94,6 +94,10 @@
 
 Связь многие-ко-многим: `symbol_id`, `interface_fqn`. Отдельная таблица, потому что интерфейсов у класса может быть несколько.
 
+### `symbol_trait` и `symbol_trait_adaptation`
+
+`symbol_trait` хранит `symbol_id`, `trait_fqn`, `trait_fqn_lower` для каждого использованного трейта. `symbol_trait_adaptation` добавляет `method_name`, необязательные `alias` и `visibility`, а также `is_excluded`: этого достаточно для учёта `insteadof` и `as` при разрешении метода. Обе записи каскадно удаляются вместе с символом.
+
 ### `symbol_alias` — псевдонимы `class_alias`
 
 | Колонка | Тип | Назначение |
@@ -161,11 +165,11 @@
 
 `component_param`: `component_id`, `code`, `type`, `name_repr`, `default_repr`, `is_default_resolved`, `parent_group`, `multiple`, `values_repr`.
 
-`is_default_resolved = 0` для значений, вычисляемых в рантайме через `GetMessage()` или `COption::GetOptionString()` — прямое следствие запрета на выполнение кода (R-004).
+`is_default_resolved = 0` для значений, вычисляемых в рантайме через `GetMessage()` или `COption::GetOptionString()` — прямое следствие запрета на выполнение кода (R-004). В MCP-ответах записи `.description.php` и `.parameters.php` объединяются по корню, модулю и `full_name`; параметры суммируются, а одноимённые компоненты разных корней не смешиваются.
 
 ### `rest_method`
 
-`module_id`, `name`, `handler_repr`, `file_id`, `line`.
+`module_id`, `name`, `handler`, `file_id`, `line`. `handler` содержит фактический `Class::method` из объявленного callback либо NULL, если цель статически не разрешена.
 
 ### `module_dependency`
 

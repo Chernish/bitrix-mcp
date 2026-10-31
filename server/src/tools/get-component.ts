@@ -1,19 +1,7 @@
 import type { IndexDatabase } from '../db/index.ts';
+import { componentGroupIsAmbiguous, findComponentGroup } from '../db/components.ts';
 import { envelope, notFound } from '../envelope.ts';
 import type { ToolDefinition } from '../types.ts';
-
-interface RawComponent {
-  id: number;
-  full_name: string;
-  namespace: string;
-  name: string;
-  title: string | null;
-  description: string | null;
-  params_resolved: number;
-  module: string;
-  module_version: string | null;
-  rel_path: string;
-}
 
 interface RawParam {
   code: string;
@@ -35,14 +23,6 @@ interface ParamOut {
   multiple?: true;
   values?: string;
 }
-
-const SELECT_COMPONENT = `
-  SELECT c.id, c.full_name, c.namespace, c.name, c.title, c.description, c.params_resolved,
-         m.code AS module, m.version AS module_version, f.rel_path
-  FROM component c
-  JOIN module m ON m.id = c.module_id
-  JOIN file   f ON f.id = c.file_id
-`;
 
 export function getComponentTool(db: IndexDatabase): ToolDefinition {
   return {
@@ -69,27 +49,26 @@ export function getComponentTool(db: IndexDatabase): ToolDefinition {
       const limit = Number(args.limit ?? 25);
       const offset = Number(args.offset ?? 0);
 
-      const component =
-        db.get<RawComponent>(`${SELECT_COMPONENT} WHERE c.full_name = ? LIMIT 1`, [query]) ??
-        db.get<RawComponent>(`${SELECT_COMPONENT} WHERE c.name = ? LIMIT 1`, [query]);
+      const component = findComponentGroup(db, query);
 
       if (!component) {
-        return notFound(db, query, 'not_in_snapshot');
+        return notFound(
+          db,
+          query,
+          componentGroupIsAmbiguous(db, query) ? 'ambiguous' : 'not_in_snapshot',
+        );
       }
 
-      const total = db.count('SELECT COUNT(*) AS c FROM component_param WHERE component_id = ?', [
-        component.id,
-      ]);
-
-      const unresolvedCount = db.count(
-        'SELECT COUNT(*) AS c FROM component_param WHERE component_id = ? AND is_default_resolved = 0',
-        [component.id],
-      );
-
+      const total = component.param_count;
+      const unresolvedCount = component.unresolved_count;
       const raw = db.all<RawParam>(
-        `SELECT code, type, default_repr, is_default_resolved, parent_group, multiple, values_repr
-         FROM component_param WHERE component_id = ? ORDER BY position LIMIT ? OFFSET ?`,
-        [component.id, limit, offset],
+        `SELECT cp.code, cp.type, cp.default_repr, cp.is_default_resolved,
+                cp.parent_group, cp.multiple, cp.values_repr
+         FROM component_param cp
+         JOIN component c ON c.id = cp.component_id
+         WHERE c.module_id = ? AND c.full_name = ?
+         ORDER BY cp.position, c.id LIMIT ? OFFSET ?`,
+        [component.module_id, component.full_name, limit, offset],
       );
 
       const params: ParamOut[] = raw.map((p) => {
@@ -113,6 +92,7 @@ export function getComponentTool(db: IndexDatabase): ToolDefinition {
           title: component.title,
           description: component.description,
           file: component.rel_path,
+          files: component.files.split(',').sort(),
           // false означает, что $arComponentParameters строится динамически.
           // Компонент существует, но список параметров статически недоступен.
           params_resolved: component.params_resolved === 1,

@@ -3,6 +3,7 @@ index.sqlite
 index.sqlite-shm
 index.sqlite-wal
 *.sqlite
+*.sqlite.lock
 *.sqlite.snapshots/
 .docs-cache/
 

@@ -1,4 +1,6 @@
 import type { IndexDatabase } from '../db/index.ts';
+import { resolveMethod } from '../db/methods.ts';
+import { lookupSymbol } from '../db/symbols.ts';
 import { envelope, notFound } from '../envelope.ts';
 import {
   MAX_DOC_RESULTS,
@@ -255,6 +257,33 @@ function compareNumericVersions(installed: string, required: string): number | n
   return 0;
 }
 
+export function documentedSymbolPresent(db: IndexDatabase, symbol: string): boolean {
+  const separator = symbol.indexOf('::');
+  if (separator >= 0) {
+    const className = symbol.slice(0, separator);
+    const methodName = symbol.slice(separator + 2);
+    if (!className || !methodName) return false;
+
+    const symbolRow = lookupSymbol(db, className, { limit: 1 }).symbols[0];
+    if (!symbolRow) return false;
+
+    const row = db.get<{ id: number }>('SELECT id FROM symbol WHERE fqn = ? LIMIT 1', [
+      symbolRow.canonical_fqn,
+    ]);
+
+    return row ? resolveMethod(db, row.id, methodName) !== undefined : false;
+  }
+
+  const needle = symbol.replace(/^\\+/, '').toLowerCase();
+
+  return db.count('SELECT COUNT(*) AS c FROM symbol WHERE short_name_lower = ? OR fqn_lower = ?', [
+    needle,
+    '\\' + needle,
+  ]) > 0 ||
+    db.count('SELECT COUNT(*) AS c FROM symbol_alias WHERE alias_short_lower = ?', [needle]) > 0 ||
+    db.count('SELECT COUNT(*) AS c FROM method WHERE name_lower = ?', [needle]) > 0;
+}
+
 /**
  * Проверка расхождения документации и кода (FR-030, Принцип I).
  *
@@ -266,17 +295,7 @@ function checkConflict(
   db: IndexDatabase,
   symbol: string,
 ): { symbol: string; doc_claims: true; present_in_snapshot: boolean; resolution: string } | null {
-  const needle = symbol.replace(/^\\+/, '').toLowerCase();
-
-  const present =
-    db.count('SELECT COUNT(*) AS c FROM symbol WHERE short_name_lower = ? OR fqn_lower = ?', [
-      needle,
-      '\\' + needle,
-    ]) > 0 ||
-    db.count('SELECT COUNT(*) AS c FROM symbol_alias WHERE alias_short_lower = ?', [needle]) > 0 ||
-    db.count('SELECT COUNT(*) AS c FROM method WHERE name_lower = ?', [needle]) > 0;
-
-  if (present) return null;
+  if (documentedSymbolPresent(db, symbol)) return null;
 
   return {
     symbol,

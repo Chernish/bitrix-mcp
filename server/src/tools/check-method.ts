@@ -1,19 +1,8 @@
 import type { IndexDatabase } from '../db/index.ts';
+import { resolveMethod } from '../db/methods.ts';
 import { lookupSymbol, similarNames } from '../db/symbols.ts';
 import { envelope } from '../envelope.ts';
 import type { ToolDefinition } from '../types.ts';
-
-interface MethodDeclaration {
-  signature: string;
-  visibility: string;
-  is_static: number;
-  is_deprecated: number;
-  line: number;
-  declared_in: string;
-  file: string;
-  module: string;
-  module_version: string | null;
-}
 
 export function checkMethodTool(db: IndexDatabase): ToolDefinition {
   return {
@@ -76,59 +65,4 @@ export function checkMethodTool(db: IndexDatabase): ToolDefinition {
       );
     },
   };
-}
-
-function resolveMethod(
-  db: IndexDatabase,
-  symbolId: number,
-  methodName: string,
-  visited: Set<number>,
-): MethodDeclaration | undefined {
-  if (visited.has(symbolId)) return undefined;
-  visited.add(symbolId);
-
-  const method = db.get<MethodDeclaration>(
-    `SELECT me.signature, me.visibility, me.is_static, me.is_deprecated, me.line,
-            s.fqn AS declared_in, f.rel_path AS file,
-            m.code AS module, m.version AS module_version
-     FROM method me
-     JOIN symbol s ON s.id = me.symbol_id
-     JOIN file f ON f.id = s.file_id
-     JOIN module m ON m.id = s.module_id
-     WHERE me.symbol_id = ? AND me.name_lower = ? LIMIT 1`,
-    [symbolId, methodName.toLowerCase()],
-  );
-
-  if (method) return method;
-
-  const traits = db.all<{ trait_fqn_lower: string }>(
-    'SELECT trait_fqn_lower FROM symbol_trait WHERE symbol_id = ? ORDER BY rowid',
-    [symbolId],
-  );
-
-  for (const trait of traits) {
-    const owner = db.get<{ id: number }>(
-      "SELECT id FROM symbol WHERE fqn_lower = ? AND kind = 'trait' ORDER BY id LIMIT 1",
-      [trait.trait_fqn_lower],
-    );
-    const inherited = owner
-      ? resolveMethod(db, owner.id, methodName, visited)
-      : undefined;
-
-    if (inherited) return inherited;
-  }
-
-  const parent = db.get<{ parent_fqn: string | null }>(
-    'SELECT parent_fqn FROM symbol WHERE id = ?',
-    [symbolId],
-  );
-
-  if (!parent?.parent_fqn) return undefined;
-
-  const owner = db.get<{ id: number }>(
-    'SELECT id FROM symbol WHERE fqn_lower = ? ORDER BY id LIMIT 1',
-    [parent.parent_fqn.toLowerCase()],
-  );
-
-  return owner ? resolveMethod(db, owner.id, methodName, visited) : undefined;
 }

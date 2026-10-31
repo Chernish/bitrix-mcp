@@ -45,6 +45,7 @@ final class MethodExtractor
                 $node->isAbstract(),
                 $params,
                 $returnType,
+                $node->returnsByRef(),
             ),
             docComment: $doc,
             isDeprecated: $isDeprecated,

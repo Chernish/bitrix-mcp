@@ -91,6 +91,59 @@ final class SnapshotStoreTest extends TestCase
         self::assertSame([], glob($this->indexPath . '.staging-*.sqlite') ?: []);
     }
 
+    public function testUnreadableFileDoesNotReplaceActiveSnapshot(): void
+    {
+        $store = new SnapshotStore($this->indexPath);
+        $beforeHash = hash_file('sha256', $this->indexPath);
+        $before = $store->list();
+        $path = $this->coreDir . '/modules/testmod/classes/general/legacy.php';
+        file_put_contents($path, (string)file_get_contents($path) . "\nclass CUnreadableNewClass {}\n");
+        self::assertTrue(chmod($path, 0o000));
+
+        try {
+            if (is_readable($path)) {
+                self::markTestSkipped('Проверку отказа чтения нужно запускать без прав root');
+            }
+
+            self::assertSame(ExitCode::ParseErrorThreshold, $this->update());
+            self::assertSame($beforeHash, hash_file('sha256', $this->indexPath));
+            self::assertSame($before, $store->list());
+        } finally {
+            chmod($path, 0o644);
+        }
+    }
+
+    public function testUnreadableModulesDirectoryDoesNotReplaceActiveSnapshot(): void
+    {
+        $store = new SnapshotStore($this->indexPath);
+        $beforeHash = hash_file('sha256', $this->indexPath);
+        $before = $store->list();
+        $path = $this->coreDir . '/modules';
+        self::assertTrue(chmod($path, 0o000));
+
+        try {
+            if (is_readable($path)) {
+                self::markTestSkipped('Проверку отказа чтения нужно запускать без прав root');
+            }
+
+            try {
+                $this->update();
+                self::fail('Нечитаемый каталог модулей не прервал update');
+            } catch (PreflightFailure $error) {
+                self::assertSame(ExitCode::ConfigError, $error->exitCode);
+            }
+
+            self::assertSame($beforeHash, hash_file('sha256', $this->indexPath));
+            self::assertSame($before, $store->list());
+            self::assertGreaterThan(
+                0,
+                $this->scalar($this->pdo($this->indexPath), 'SELECT COUNT(*) FROM symbol'),
+            );
+        } finally {
+            chmod($path, 0o755);
+        }
+    }
+
     public function testRepeatedVersionGetsNewIdAndActiveCannotBeDeleted(): void
     {
         $store = new SnapshotStore($this->indexPath);
@@ -175,6 +228,74 @@ final class SnapshotStoreTest extends TestCase
 
         foreach ($snapshots as $metadata) {
             self::assertSame($metadata['id'], $store->metadata($metadata['id'])['id']);
+        }
+    }
+
+    public function testVersionedCommandWaitsForWholePublicationOperation(): void
+    {
+        $this->changeCore();
+        $store = new SnapshotStore($this->indexPath);
+        $marker = $this->indexPath . '.attempt';
+        $process = null;
+        $pipes = [];
+
+        try {
+            $store->withOperationLock(function () use (&$process, &$pipes, $marker): void {
+                $autoload = dirname(__DIR__, 2) . '/vendor/autoload.php';
+                $script = sprintf(
+                    'require %s; file_put_contents(%s, "ready"); '
+                    . 'exit((new \BitrixMcp\Indexer\Command\VersionedCommand('
+                    . 'new \BitrixMcp\Indexer\Command\UpdateCommand()))->run('
+                    . '["core" => %s, "index" => %s], '
+                    . 'new \BitrixMcp\Indexer\Command\Reporter())->value);',
+                    var_export($autoload, true),
+                    var_export($marker, true),
+                    var_export($this->coreDir, true),
+                    var_export($this->indexPath, true),
+                );
+                $process = proc_open(
+                    [PHP_BINARY, '-d', 'short_open_tag=1', '-r', $script],
+                    [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']],
+                    $pipes,
+                );
+                self::assertIsResource($process);
+
+                $deadline = microtime(true) + 5;
+                while (!is_file($marker) && microtime(true) < $deadline) {
+                    usleep(10_000);
+                }
+
+                self::assertFileExists($marker, 'Процесс update не запустился');
+                usleep(100_000);
+                self::assertSame(
+                    '99.100.200',
+                    $this->scalar($this->pdo($this->indexPath), 'SELECT sm_version FROM snapshot WHERE id = 1'),
+                    'Update перезаписал индекс во время другой операции публикации',
+                );
+                self::assertSame(
+                    0,
+                    $this->scalar($this->pdo($this->indexPath), "SELECT COUNT(*) FROM symbol WHERE short_name = 'CVersionedB'"),
+                );
+            });
+
+            self::assertIsResource($process);
+            $output = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            self::assertSame(0, proc_close($process), $output);
+            $process = null;
+            self::assertSame(
+                '100.200.0',
+                $this->scalar($this->pdo($this->indexPath), 'SELECT sm_version FROM snapshot WHERE id = 1'),
+            );
+        } finally {
+            if (is_resource($process)) {
+                proc_terminate($process);
+                proc_close($process);
+            }
+            if (is_file($marker)) {
+                unlink($marker);
+            }
         }
     }
 

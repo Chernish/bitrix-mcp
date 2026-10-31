@@ -75,8 +75,19 @@ export function listEventsTool(db: IndexDatabase): ToolDefinition {
         return notFound(db, moduleCode, 'not_in_snapshot');
       }
 
-      const where: string[] = ['owner_module = ?'];
-      const params: unknown[] = [moduleCode];
+      const where: string[] = [];
+      const params: unknown[] = [];
+
+      if (kind === 'register') {
+        where.push('module_id IN (SELECT id FROM module WHERE code = ?)');
+        params.push(moduleCode);
+      } else if (kind === 'send') {
+        where.push('owner_module = ?');
+        params.push(moduleCode);
+      } else {
+        where.push('(owner_module = ? OR module_id IN (SELECT id FROM module WHERE code = ?))');
+        params.push(moduleCode, moduleCode);
+      }
 
       if (kind !== 'any') {
         where.push('kind = ?');

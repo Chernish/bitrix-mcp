@@ -33,6 +33,7 @@ final class SignatureRenderer
         bool $isAbstract,
         array $params,
         ?string $returnType,
+        bool $returnsByRef = false,
     ): string {
         $prefix = $visibility;
 
@@ -70,7 +71,8 @@ final class SignatureRenderer
             $rendered[] = $part;
         }
 
-        $signature = $prefix . ' function ' . $name . '(' . implode(', ', $rendered) . ')';
+        $signature = $prefix . ' function ' . ($returnsByRef ? '&' : '')
+            . $name . '(' . implode(', ', $rendered) . ')';
 
         if ($returnType !== null) {
             $signature .= ': ' . $returnType;
@@ -80,9 +82,13 @@ final class SignatureRenderer
     }
 
     /** @param list<ExtractedParameter> $params */
-    public function renderFunction(string $name, array $params, ?string $returnType): string
-    {
-        $method = $this->render($name, '', false, false, $params, $returnType);
+    public function renderFunction(
+        string $name,
+        array $params,
+        ?string $returnType,
+        bool $returnsByRef = false,
+    ): string {
+        $method = $this->render($name, '', false, false, $params, $returnType, $returnsByRef);
 
         return ltrim($method);
     }
@@ -105,17 +111,28 @@ final class SignatureRenderer
         return match (true) {
             $type === null => null,
             $type instanceof Node\Identifier => $type->toString(),
-            $type instanceof Node\Name => '\\' . $type->toString(),
+            $type instanceof Node\Name => in_array($type->toLowerString(), ['self', 'static', 'parent'], true)
+                ? $type->toLowerString()
+                : '\\' . $type->toString(),
             $type instanceof Node\NullableType => '?' . self::renderType($type->type),
             $type instanceof Node\UnionType => implode('|', array_map(
-                static fn($t) => self::renderType($t) ?? 'mixed',
+                static fn($t) => self::renderTypePart($t, $t instanceof Node\IntersectionType),
                 $type->types,
             )),
             $type instanceof Node\IntersectionType => implode('&', array_map(
-                static fn($t) => self::renderType($t) ?? 'mixed',
+                static fn($t) => self::renderTypePart($t, $t instanceof Node\UnionType),
                 $type->types,
             )),
             default => null,
         };
+    }
+
+    private static function renderTypePart(
+        Node\Identifier|Node\Name|Node\ComplexType $type,
+        bool $parenthesize,
+    ): string {
+        $rendered = self::renderType($type) ?? 'mixed';
+
+        return $parenthesize ? '(' . $rendered . ')' : $rendered;
     }
 }

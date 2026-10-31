@@ -36,24 +36,27 @@ final class VersionedCommand
         }
 
         $store = new SnapshotStore($activePath);
-        $staging = $store->stage();
-        $stagedCli = $cli;
-        $stagedCli['index'] = $staging;
 
-        try {
-            $code = $this->command->run($stagedCli, $out);
-            if ($code !== ExitCode::Success) {
-                return $code;
+        return $store->withOperationLock(function () use ($store, $cli, $activePath, $out): ExitCode {
+            $staging = $store->stage();
+            $stagedCli = $cli;
+            $stagedCli['index'] = $staging;
+
+            try {
+                $code = $this->command->run($stagedCli, $out);
+                if ($code !== ExitCode::Success) {
+                    return $code;
+                }
+
+                $metadata = $store->publish($staging);
+                $out->line('');
+                $out->line("Снимок: {$metadata['id']}");
+                $out->line("Активный индекс: {$activePath}");
+
+                return ExitCode::Success;
+            } finally {
+                $store->discard($staging);
             }
-
-            $metadata = $store->publish($staging);
-            $out->line('');
-            $out->line("Снимок: {$metadata['id']}");
-            $out->line("Активный индекс: {$activePath}");
-
-            return ExitCode::Success;
-        } finally {
-            $store->discard($staging);
-        }
+        });
     }
 }
